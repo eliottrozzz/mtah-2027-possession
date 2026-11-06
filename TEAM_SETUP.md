@@ -92,15 +92,17 @@ Two kinds of decision. **Rules** we agree by talking, using the definition in CH
 
 ### Possession rules
 
+The current rules and the evidence behind them live in **[POSSESSION_RULES.md](POSSESSION_RULES.md)**. Summary below.
+
 | Decision | Our starting answer | Number to tune externally |
 |---|---|---|
-| **Control:** what counts as a team gaining the ball | Sustained control: the player keeps it, or the team completes passes. A single touch, deflection or won header does not count | How long control must last, or how many passes |
-| **Contested balls:** tackles, loose balls, scrambles | Stay with the last team in control until the other team gains control. Internally the model may use a "contested" state, rewritten to the last controlling team at the end | — |
-| **Where the switch goes** | At the start of the new team's control, not at the tackle | How far back to place it |
+| **Who has the ball** | The team whose player last touched it on purpose (pass, header, tackle, clearance, control). No control needed. Accidental deflections don't count | — |
+| **Contested balls:** tackles, loose balls, scrambles | Stay with the last team with a deliberate touch. Internally the model may use a "contested" state, rewritten to that team at the end | — |
+| **Where the switch goes** | At the new team's first deliberate touch | — |
 | **Dead ball start** | When the ball crosses a line, or play stops for a foul | Thresholds for "ball off the pitch" and "everyone slows down" |
 | **Dead ball end** | When the restart is taken (first touch of the set piece) | — |
 | **Fouls with advantage** | Play continues, so no `D` | — |
-| **Shots and saves** | A keeper catch is control. A parry or block is a touch, not control | — |
+| **Shots and saves** | A keeper catch counts. A parry is open: deliberate touch or deflection? | — |
 | **Restarts** | The team taking the restart has the ball. Throw-ins are tagged `N/A` in Smart Tagging, so we work out the team ourselves | — |
 | **Second half** | Frames 110,808–113,741 are graded and all `D` (before the second-half kickoff) | — |
 
@@ -110,7 +112,7 @@ Two kinds of decision. **Rules** we agree by talking, using the definition in CH
 |---|---|---|
 | **Ball missing (41% of graded frames)** | Never write `D` just because the ball is missing; that splits real possessions | Max gap to interpolate across |
 | **When to write `X`** | Almost never: the scorer turns `X` into our previous label anyway, and macroF1 (the tie-break) counts it as a miss | — |
-| **Minimum possession length / switch cost** | Penalise very short possessions | The penalty |
+| **Minimum possession length / switch cost** | Penalise flicker, but allow real possessions of about 1 s (they exist in the public 5 minutes) | The penalty |
 | **Smart Tagging** | Use it as evidence (set pieces mark restarts, phases carry a team), never copy its intervals directly | How much weight it gets |
 
 ### Answer key for the external games (P1, agreed by all)
