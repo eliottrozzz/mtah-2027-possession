@@ -53,7 +53,8 @@ We avoid it in three ways, together:
 
 `metrica_noise.py` writes `data/external/metrica/noisy/game{g}_live{level}_seed{s}.npz`, the same format as above. It deletes the ball for most of long passes, crosses, keeper kicks and throws and shots, plus random gaps that are more likely on fast balls and in crowds. It also shows a still ball during some stoppages, breaks player tracks into anonymous team slots, and jitters positions.
 
-* `live20/35/50`: the share of live frames with no ball. We don't know the real split between live and dead play, so check that a model holds up across all three.
+* `live20/35/50`: the share of live frames with no ball. We can't measure the real split between live and dead play without the ground truth, but the provided tracking points to between 20% and 35%: its 41% missing comes in long gaps, and more of them end as a Smart Tagging set piece starts than chance would give (47% against 35%). So **tune on `live20` and `live35`, and use `live50` as a stress test.** Don't trust a model that only works at one level.
+* What the provided tracking showed (`measure_ball_gaps.py`): 150 gaps in 106 minutes, median 10.7 s; gaps start most often on a slow or still ball (×1.7), in crowds (×2.6 with 3+ players near), near a goal (×1.8) or a touchline (×1.5), and almost never on a fast ball. The noise copies that pattern.
 * `seed0` is for tuning, `seed1` for testing.
 * `ball_reason` says why the ball is missing on each frame (0 seen, 1 missing in the clean data, 2 in the air, 3 random gap, 4 still ball shown in a stoppage). Use it for analysis only, never as a model input: our match has no such column.
 
