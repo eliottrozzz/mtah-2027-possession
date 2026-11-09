@@ -42,6 +42,21 @@ We avoid it in three ways, together:
 2. **Dead-ball detection from the players (Person 2).** Decide "dead or alive" mainly from the players, not the ball: everyone slowing down, players walking, a wall forming, someone waiting at the touchline. That behaves the same whether or not the ball is tracked, so it carries over to our match. The ball is a supporting clue only.
 3. **Ball-gap filling (Person 2).** Estimate where the ball is during short gaps, from its last position and who's nearby, so fewer frames have no ball at all. Long gaps stay missing rather than guessed.
 
+## Noisy copies: what everything trains and scores on
+
+```bash
+.venv/bin/python external/measure_ball_gaps.py                                   # on the provided match
+.venv/bin/python external/metrica_noise.py --calibration data/ball_gap_stats.json
+```
+
+`measure_ball_gaps.py` reads the provided tracking (not the ground truth, not the video) and prints only summary numbers: how often and for how long the ball goes missing, and how much more often on fast balls and in crowds. Run it locally; its printout is safe to share. Without it, `metrica_noise.py` uses defaults.
+
+`metrica_noise.py` writes `data/external/metrica/noisy/game{g}_live{level}_seed{s}.npz`, the same format as above. It deletes the ball for most of long passes, crosses, keeper kicks and throws and shots, plus random gaps that are more likely on fast balls and in crowds. It also shows a still ball during some stoppages, breaks player tracks into anonymous team slots, and jitters positions.
+
+* `live20/35/50`: the share of live frames with no ball. We don't know the real split between live and dead play, so check that a model holds up across all three.
+* `seed0` is for tuning, `seed1` for testing.
+* `ball_reason` says why the ball is missing on each frame (0 seen, 1 missing in the clean data, 2 in the air, 3 random gap, 4 still ball shown in a stoppage). Use it for analysis only, never as a model input: our match has no such column.
+
 ## Also in the tracking
 
 * **2D ball:** a high ball passes straight through the positions of the players it flies over. Being near the ball is not a touch. A touch shows up as a sudden change in the ball's speed or direction.
