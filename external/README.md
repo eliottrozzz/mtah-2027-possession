@@ -34,7 +34,13 @@ game = load_game(1)    # about 15 s the first time (download and convert), then 
 
 In the Metrica games the ball is tracked on 98–99% of live frames and is mostly missing when the ball is dead. In our match the ball is missing on 41% of graded frames, including a lot of live play.
 
-So **"ball missing" means "dead ball" in Metrica, but not in our match.** A model trained on clean Metrica tracking would learn that shortcut and then call live play dead on our match, splitting real possessions. Before training or tuning, we delete the ball during live play in the Metrica copy (the noise step), so the model has to use other clues for a dead ball: players slowing down, the ball still, a set piece forming.
+So **"ball missing" means "dead ball" in Metrica, but not in our match.** A model trained on clean Metrica tracking would learn that shortcut and then call live play dead on our match, splitting real possessions.
+
+We avoid it in three ways, together:
+
+1. **Noise (Person 1).** In the Metrica copy, delete the ball during live play too, in bursts, so it's missing about as often as in our match. All training, tuning and scoring uses the noisy copy, which also shows whether a model still falls for the shortcut.
+2. **Dead-ball detection from the players (Person 2).** Decide "dead or alive" mainly from the players, not the ball: everyone slowing down, players walking, a wall forming, someone waiting at the touchline. That behaves the same whether or not the ball is tracked, so it carries over to our match. The ball is a supporting clue only.
+3. **Ball-gap filling (Person 2).** Estimate where the ball is during short gaps, from its last position and who's nearby, so fewer frames have no ball at all. Long gaps stay missing rather than guessed.
 
 ## Also in the tracking
 
