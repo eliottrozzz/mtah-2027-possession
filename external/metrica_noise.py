@@ -63,7 +63,11 @@ GAP_QUANTILES_S = {"10": 0.2, "25": 0.4, "50": 1.0, "75": 2.0, "90": 4.0, "95": 
 MAX_LIVE_GAP_S = 15.0          # longer gaps in the real match are mostly stoppages
 SPEED_RATIOS = {"0-5": 0.8, "5-15": 1.0, "15-25": 2.0, "25-inf": 3.0}
 CROWD_RATIOS = {"0-1": 0.8, "1-2": 1.0, "2-3": 1.5, "3-inf": 2.5}
+GOAL_RATIOS = {"0-1": 1.0, "1-2": 1.0}          # "1-2" is near a goal line
+TOUCHLINE_RATIOS = {"0-1": 1.0, "1-2": 1.0}     # "1-2" is near a touchline
 CROWD_RADIUS_M = 3.0
+NEAR_GOAL = 0.17               # as in measure_ball_gaps.py
+NEAR_TOUCHLINE = 0.10
 
 # Ball during stoppages.
 DEAD_VISIBLE_PROB = 0.5        # chance a stoppage shows a still ball for part of it
@@ -92,12 +96,21 @@ def runs(mask):
 
 def calibrate(path):
     """Replace the default gap lengths and ratios with ones measured on the provided match."""
-    global GAP_QUANTILES_S, SPEED_RATIOS, CROWD_RATIOS, CUTS_PER_MINUTE
+    global GAP_QUANTILES_S, SPEED_RATIOS, CROWD_RATIOS, GOAL_RATIOS, TOUCHLINE_RATIOS
+    global AIR_DROP_PROB, CUTS_PER_MINUTE
     with open(path) as handle:
         stats = json.load(handle)
     GAP_QUANTILES_S = stats["short_gap_quantiles_s"]
     SPEED_RATIOS = {k: v["ratio"] for k, v in stats["hazard_speed"].items()}
     CROWD_RATIOS = {k: v["ratio"] for k, v in stats["hazard_crowd"].items()}
+    GOAL_RATIOS = {k: v["ratio"] for k, v in stats["hazard_near_goal"].items()}
+    TOUCHLINE_RATIOS = {k: v["ratio"] for k, v in stats["hazard_near_touchline"].items()}
+    # Flights lose the ball as often as the real tracker loses a fast ball (over 15 m/s).
+    fast = [v for k, v in stats["hazard_speed"].items() if float(k.split("-")[0]) >= 15]
+    share = sum(v["share_of_frames"] for v in fast)
+    if share:
+        AIR_DROP_PROB = min(1.0, AIR_DROP_PROB * sum(v["ratio"] * v["share_of_frames"]
+                                                     for v in fast) / share)
     # A median fragment of m seconds means a break roughly every m seconds.
     CUTS_PER_MINUTE = 60.0 / max(stats["fragment_quantiles_s"]["50"], 1.0)
     return stats
@@ -169,7 +182,11 @@ def random_gaps(game, live, seen, target_missing, fixed_drop, rng):
     speed[2:] = np.hypot(*(ball[2:] - ball[:-2]).T) * FPS / 2.0
     near = np.hypot(*(metres(game["players"]) - ball[:, None, :]).transpose(2, 0, 1))
     crowd = np.sum(near < CROWD_RADIUS_M, axis=1).astype(float)
-    weight = bin_ratio(speed, SPEED_RATIOS) * bin_ratio(crowd, CROWD_RATIOS)
+    xy = game["ball"]
+    near_goal = (np.minimum(xy[:, 0], 1 - xy[:, 0]) < NEAR_GOAL).astype(float)
+    near_touch = (np.minimum(xy[:, 1], 1 - xy[:, 1]) < NEAR_TOUCHLINE).astype(float)
+    weight = (bin_ratio(speed, SPEED_RATIOS) * bin_ratio(crowd, CROWD_RATIOS)
+              * bin_ratio(near_goal, GOAL_RATIOS) * bin_ratio(near_touch, TOUCHLINE_RATIOS))
     weight[~(live & seen)] = 0.0
 
     draws = rng.random(n)

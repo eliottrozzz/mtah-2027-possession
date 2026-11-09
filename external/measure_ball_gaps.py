@@ -22,7 +22,9 @@ import numpy as np
 HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.dirname(HERE)
 sys.path.insert(0, ROOT)
+sys.path.insert(0, os.path.join(ROOT, "starter"))
 from games import GAME, GAMES, half_video_blocks, require, source_frames  # noqa: E402
+import load_smart_tagging  # noqa: E402
 
 # Params
 OUT_PATH = os.path.join(ROOT, "data", "ball_gap_stats.json")
@@ -35,6 +37,7 @@ CROWD_BINS = ((0, 1), (1, 2), (2, 3), (3, np.inf))       # players within CROWD_
 CROWD_RADIUS = 3.0                                        # metres
 NEAR_GOAL = 0.17                                          # x within ~18 m of either goal line
 NEAR_TOUCHLINE = 0.10                                     # y within ~7 m of either touchline
+SET_PIECE_MARGIN_S = 5.0                                  # a gap "ends at" a set piece this close
 
 
 def read_atd(raw_path, n_frames, n_slots):
@@ -86,6 +89,29 @@ def hazard_ratios(values, bins, seen, gap_starts):
     return out
 
 
+def stoppage_share(gaps, graded, game, data_dir):
+    """How many gaps end at a Smart Tagging set piece, against what chance would give.
+
+    A gap that ends as a restart is taken was very likely a stoppage, so this estimates how much
+    of the missing ball is dead-ball time. Smart Tagging is automatic and misses some restarts
+    (fewer throw-ins are tagged than a match has), so this is a lower bound. No ground truth.
+    """
+    margin = int(SET_PIECE_MARGIN_S * FPS)
+    set_pieces = [t for t in load_smart_tagging.load(game, data_dir)
+                  if t["code"].strip().lower() == "set pieces"]
+    near = np.zeros(len(graded), dtype=bool)
+    for tag in set_pieces:
+        near[max(0, tag["start_frame"] - margin):tag["end_frame"] + margin] = True
+    ends_near = np.array([near[min(b, len(near) - 1)] for _, b in gaps])
+    lengths = np.array([b - a for a, b in gaps])
+    return {
+        "set_pieces_tagged": len(set_pieces),
+        "gaps_ending_at_set_piece": float(ends_near.mean()),
+        "missing_in_gaps_ending_at_set_piece": float(lengths[ends_near].sum() / lengths.sum()),
+        "chance_share_of_graded_frames": float(near[graded].mean()),
+    }
+
+
 def measure(game=GAME, data_dir=None):
     meta_path, raw_path = require(["atd_meta", "atd_raw"], game, data_dir)
     n_slots = len(list(ET.parse(meta_path).getroot().iter("Player")))
@@ -126,6 +152,7 @@ def measure(game=GAME, data_dir=None):
         "short_gap_quantiles_s": {str(q): float(np.percentile(lengths[lengths <= SHORT_GAP_S], q))
                                   for q in GAP_QUANTILES},
         "missing_in_gaps_over_10s": float(lengths[lengths > 10].sum() * FPS / missing.sum()),
+        "stoppages": stoppage_share(gaps, graded, game, data_dir),
         "hazard_speed": hazard_ratios(speed, SPEED_BINS, on_ball, gap_starts),
         "hazard_crowd": hazard_ratios(crowd, CROWD_BINS, on_ball, gap_starts),
         "hazard_near_goal": hazard_ratios(near_goal, ((0, 1), (1, 2)), on_ball, gap_starts),
@@ -147,6 +174,11 @@ def show(stats):
         "p{} {:.1f}".format(q, v) for q, v in stats["short_gap_quantiles_s"].items()))
     print("share of missing frames in gaps over 10 s: {:.1%}".format(
         stats["missing_in_gaps_over_10s"]))
+    stop = stats["stoppages"]
+    print("gaps ending at a tagged set piece: {:.1%} of gaps, {:.1%} of missing frames "
+          "({} set pieces tagged; chance level {:.1%})".format(
+              stop["gaps_ending_at_set_piece"], stop["missing_in_gaps_ending_at_set_piece"],
+              stop["set_pieces_tagged"], stop["chance_share_of_graded_frames"]))
     for name in ("hazard_speed", "hazard_crowd", "hazard_near_goal", "hazard_near_touchline"):
         print("{:<22}".format(name) + "  ".join(
             "{} x{:.2f} ({:.0%})".format(k, v["ratio"], v["share_of_frames"])
