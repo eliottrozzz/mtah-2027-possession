@@ -22,8 +22,10 @@ opponent's touch that changes nothing is not a loss. So:
                                             other team's next RECOVERY or PASS
   BALL OUT, FAULT RECEIVED, shot GOAL/OUT,  D: play has stopped
   OFFSIDE, FORCED, HAND BALL, END HALF
-  restart after D (SET PIECE, or a RECOVERY D until the restart pass is received (--restart
-  in a stoppage, Metrica's goal-kick marker) reception) or from the kick (--restart kick)
+  SET PIECE after D                         D until the restart pass is received (--restart
+                                            reception) or from the kick (--restart kick)
+  RECOVERY after D (keeper rolling the ball alive from the RECOVERY, before the goal kick,
+  out, Metrica's goal-kick marker)          as the public ground truth does at 12:15
 
 Deflections are mostly not events in Metrica's data, so they are ignored without any rule. The
 exceptions are blocks and saves, which Metrica logs as RECOVERY: a block never switches
@@ -207,13 +209,12 @@ def label_period(events, labels, restart):
                     # A restart pass with no SET PIECE logged, e.g. a goal kick.
                     change(end_frame(event) if restart == "reception" else event["start"], team)
                     state = team
-                elif kind == "RECOVERY":
-                    # Metrica's marker for a restart that is not a SET PIECE, usually a goal kick:
-                    # the keeper collecting the ball, a median 2.4 s before the kick. Like a set
-                    # piece, the ball stays dead until the restart pass.
-                    awaiting = team
                 else:
-                    # A SHOT or CARRY with no restart logged means play is already running.
+                    # A RECOVERY in a stoppage is Metrica's marker for the ball being brought
+                    # back into play other than by a SET PIECE: usually the keeper rolling it out
+                    # before a goal kick, a median 2.4 s before the kick. The public ground truth
+                    # agrees: at 12:15 it ends D when the keeper rolls the ball to a defender,
+                    # before the kick. A SHOT or CARRY means play is already running.
                     change(event["start"], team)
                     state = team
             elif state == "D":

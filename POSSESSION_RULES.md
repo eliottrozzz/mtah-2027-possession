@@ -54,7 +54,7 @@ This is stricter than CHALLENGE.md's wording, which says a won aerial duel witho
 * **Advantage** is play on: no `D` until the referee actually stops play.
 * **Ends when the restart pass is received**, not when it is kicked (provisional). At the 8:38 free kick, the ball is still `D` in the air and `H` starts at 8:39.56, when the defender receives it. The restarting team has possession from the reception.
 * **Handling or placing the ball during a stoppage doesn't end `D`.** At 8:35 – 8:38 a Barcelona player picks up, kicks and places the ball, and it stays `D`.
-* **Not settled:** at the 12:15 goal kick, `D` ends when the keeper rolls the ball to a defender, before the defender takes the kick at about 12:17. That may be the defender receiving the roll, which would fit the reception rule. Check the frame.
+* **Goal kicks are the exception:** at 12:15, `D` ends when the keeper rolls the ball to a defender, about 1.5 s before the defender takes the goal kick at about 12:17. So the ball is alive from the keeper bringing it back into play, not from the kick. Metrica logs that moment as a RECOVERY.
 * **Before it goes out:** the last team with a deliberate touch keeps possession until the ball crosses the line, even if an opponent is closer.
 * **Goals:** `D` from the goal until the kick-off. Not seen yet: no goal in the public 5 minutes.
 
@@ -73,7 +73,7 @@ This is stricter than CHALLENGE.md's wording, which says a won aerial duel witho
 | 11:30 – 11:35 | Athletic pass deflects off a Barcelona player's legs, Barcelona player reaches the ball, his back-pass goes out | `H` from 11:31.72, `D` from 11:35.20 | Deflection doesn't count; switch at the deliberate touch |
 | 11:53 | Athletic corner | `A` from 11:53.52 | Restart starts possession |
 | 12:00 – 12:01 | Athletic ball into the box, nobody touches it, goes out | stays `A`, `D` from 12:01.08 | No touch, no switch |
-| 12:15 – 12:17 | Keeper rolls the ball to a defender (12:15), defender takes the goal kick (12:17) | `H` from 12:15.56 | `D` ends before the legal restart, possibly at the defender receiving the roll |
+| 12:15 – 12:17 | Keeper rolls the ball to a defender (12:15), defender takes the goal kick (12:17) | `H` from 12:15.56 | Goal kick: `D` ends when the keeper rolls the ball out, before the legal restart |
 
 ---
 
