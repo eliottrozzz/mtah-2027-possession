@@ -20,8 +20,9 @@ opponent's touch that changes nothing is not a loss. So:
   PASS, SHOT, RECOVERY, CARRY, SET PIECE   that team has the ball from the event's start frame
   CHALLENGE, BALL LOST, CARD                no change on their own; the switch comes with the
                                             other team's next RECOVERY or PASS
-  BALL OUT, FAULT RECEIVED, shot GOAL/OUT,  D: play has stopped
-  OFFSIDE, FORCED, HAND BALL, END HALF
+  BALL OUT, FAULT RECEIVED, CHALLENGE with  D: play has stopped
+  a FAULT subtype, shot GOAL/OUT, OFFSIDE,
+  FORCED, HAND BALL, END HALF
   SET PIECE after D                         D until the restart pass is received (--restart
                                             reception) or from the kick (--restart kick)
   RECOVERY after D (keeper rolling the ball alive from the RECOVERY, before the goal kick,
@@ -150,6 +151,10 @@ def stop_frame(event):
     if event["type"] == "BALL OUT":
         return end_frame(event)
     if event["type"] == "FAULT RECEIVED":
+        return event["start"]
+    if event["type"] == "CHALLENGE" and "FAULT" in event["sub"]:
+        # Metrica's FAULT subtype means the referee awarded a free kick, and many fouls are
+        # logged only this way, with no FAULT RECEIVED. Advantage is a separate subtype.
         return event["start"]
     hits = event["sub"] & STOPPING_SUBTYPES
     if not hits:
