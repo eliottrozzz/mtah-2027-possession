@@ -37,7 +37,8 @@ class TouchDead:
 
     def touches(self, tracking):
         p = self.touch.params
-        frames, teams = find_touches(tracking, p["min_strength"], p["radius_m"], p["window"])
+        frames, teams = find_touches(tracking, p["min_strength"], p["radius_m"], p["window"],
+                                     p.get("assign", "at"))
         return drop_deflections(frames, teams, int(p["deflection_s"] * FPS))
 
     def fit(self, train):
