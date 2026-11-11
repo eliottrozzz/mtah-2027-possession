@@ -19,6 +19,7 @@ training games (external data only) and keeping the best spellF1.
 import itertools
 import os
 import sys
+import warnings
 
 import numpy as np
 
@@ -37,13 +38,20 @@ GRID = {
     "min_strength": (1.0, 1.5, 2.0, 3.0, 4.0),  # m/s change in velocity
     "radius_m": (1.0, 1.5, 2.5, 3.5),
     "window": (4, 8, 12),                        # frames each side (0.16, 0.32, 0.48 s)
+    # Whose touch it is (see assign_players). Tried 2026-11-11: with "at", "after" and "closest"
+    # in the grid, fit picked "closest" in every round and v1 alone rose 0.358 -> 0.365, but v2
+    # only rose 0.464 -> 0.467 and game 3 dropped 0.026 at live35, over the 0.02 limit: not kept.
+    # The other rules stay available for later tests.
+    "assign": ("at",),
     # Fixed at 0.5 s, a rule decision, not tuned: the public ground truth counts single touches of
     # about 0.8 s as real possessions, so the window must stay well below that (touch timing is
     # only known to about +-0.16 s). Metrica prefers 0.8 s, but its events log fewer quick touches
     # than the organisers do. Scores for 0.4-0.6 s were within 0.003. Decided 2026-11-11.
     "deflection_s": (0.5,),
 }
-DEFAULTS = {"min_strength": 2.0, "radius_m": 2.5, "window": 8, "deflection_s": 0.5}
+DEFAULTS = {"min_strength": 2.0, "radius_m": 2.5, "window": 8, "assign": "at",
+            "deflection_s": 0.5}
+AFTER_FRAMES = 12               # "after": how long the toucher should stay near the ball (0.48 s)
 
 
 def touch_strength(ball, window=WINDOW):
@@ -59,7 +67,7 @@ def touch_strength(ball, window=WINDOW):
     return strength
 
 
-def find_touches(tracking, min_strength, radius_m, window=WINDOW):
+def find_touches(tracking, min_strength, radius_m, window=WINDOW, assign="at"):
     """(frames, teams) of touches: peaks of touch strength with a player within radius_m."""
     strength = touch_strength(tracking["ball"], window)
     filled = np.nan_to_num(strength, nan=0.0)
@@ -70,13 +78,39 @@ def find_touches(tracking, min_strength, radius_m, window=WINDOW):
     if not len(peaks):
         return peaks, np.array([], dtype="<U1")
 
-    ball = tracking["ball"][peaks] * PITCH
-    players = tracking["players"][peaks] * PITCH
-    dist = np.hypot(*(players - ball[:, None, :]).transpose(2, 0, 1))
-    dist = np.where(np.isnan(dist), np.inf, dist)
-    nearest = np.argmin(dist, axis=1)
-    close = dist[np.arange(len(peaks)), nearest] <= radius_m
+    nearest, dist = assign_players(tracking, peaks, assign, window)
+    close = dist <= radius_m
     return peaks[close], tracking["team"][nearest[close]]
+
+
+def assign_players(tracking, peaks, assign, window):
+    """(player index, distance in m) for each touch frame, by one of three rules.
+
+        at       nearest player at the touch frame
+        after    nearest on average over the AFTER_FRAMES frames from the touch: whoever keeps
+                 the ball close (a receiver) rather than whoever it passed on the way
+        closest  the player who came closest to the ball at any frame within +-window of the
+                 touch, which cancels the lag of a smoothed ball
+    """
+    n = len(tracking["ball"])
+    if assign == "at":
+        offsets = np.array([0])
+    elif assign == "after":
+        offsets = np.arange(0, AFTER_FRAMES + 1)
+    elif assign == "closest":
+        offsets = np.arange(-window, window + 1)
+    else:
+        raise ValueError("unknown assign rule: " + str(assign))
+    frames = np.clip(peaks[:, None] + offsets[None, :], 0, n - 1)          # (touches, offsets)
+    ball = tracking["ball"][frames] * PITCH                                 # (t, o, 2)
+    players = tracking["players"][frames] * PITCH                           # (t, o, p, 2)
+    dist = np.hypot(*(players - ball[:, :, None, :]).transpose(3, 0, 1, 2))   # (t, o, p)
+    with np.errstate(all="ignore"), warnings.catch_warnings():
+        warnings.simplefilter("ignore", RuntimeWarning)
+        per_player = np.nanmean(dist, axis=1) if assign == "after" else np.nanmin(dist, axis=1)
+    per_player = np.where(np.isnan(per_player), np.inf, per_player)
+    nearest = np.argmin(per_player, axis=1)
+    return nearest, per_player[np.arange(len(peaks)), nearest]
 
 
 def drop_deflections(frames, teams, deflection_frames):
@@ -124,7 +158,7 @@ class LastTouch:
 
     def predict_with(self, tracking, params):
         frames, teams = find_touches(tracking, params["min_strength"], params["radius_m"],
-                                     params["window"])
+                                     params["window"], params.get("assign", "at"))
         frames, teams = drop_deflections(frames, teams, int(params["deflection_s"] * FPS))
         labels = possession_from_touches(len(tracking["ball"]), frames, teams)
         labels[tracking["period"] == 0] = "D"
