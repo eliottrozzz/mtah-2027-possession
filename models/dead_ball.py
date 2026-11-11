@@ -2,7 +2,8 @@
 
 In our match the ball is missing on 41% of frames, much of it during live play, so "no ball" must
 not mean "dead ball". The detector decides dead or alive from what the players do (everyone
-slowing down, nobody sprinting, more players walking), with the ball as a supporting clue only
+slowing down, nobody sprinting, more players walking, the team shapes freezing, players gathering
+for a wall or a corner, someone standing at the touchline), with the ball as a supporting clue only
 while it is visible (off the pitch, or lying still). Whether the ball is missing is never an input.
 
 How it works:
@@ -36,6 +37,9 @@ MAX_SPEED = 12.0              # m/s; a player "moving" faster than this is a tra
 WALK_SPEED = 2.0              # m/s, relative units after normalising (see frame_features)
 SPRINT_SPEED = 3.5
 BALL_STILL_SPEED = 1.0        # m/s
+GROUP_RADIUS_M = 4.0          # players this close together count as one group (a wall, a corner)
+TOUCHLINE_M = 1.0             # a player within this of a touchline, or beyond it, is "at" it
+STANDING_SPEED = 1.0          # m/s
 WINDOWS_S = (2, 8, 20)        # centred smoothing windows
 SIDE_WINDOW_S = 6             # windows just before and just after the frame
 FIT_STEP = 5                  # use every 5th frame to fit the regression (neighbours are alike)
@@ -110,7 +114,51 @@ def frame_features(tracking):
     return {"median_speed": per_half_scale(median, period),
             "fast_speed": per_half_scale(fast, period),
             "walking": walking, "sprinting": sprinting,
+            "shape_moving": per_half_scale(shape_movement(players, tracking["team"]), period),
+            "gathered": largest_group(players),
+            "at_touchline": standing_at_touchline(players, speed),
             "ball_out": ball_out, "ball_still": ball_still}
+
+
+def shape_movement(players, team):
+    """How fast the team shapes change: speed of each team's centre plus the rate its spread
+    changes, averaged over both teams. Low when both teams stand and wait."""
+    pos = players * np.array(PITCH, dtype=np.float32)
+    total = np.zeros(len(players))
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore", RuntimeWarning)
+        for side in ("H", "A"):
+            p = pos[:, team == side]
+            centre = np.nanmean(p, axis=1)
+            spread = np.nanmean(np.hypot(*(p - centre[:, None, :]).transpose(2, 0, 1)), axis=1)
+            move = np.full(len(players), np.nan)
+            move[1:] = (np.hypot(*(centre[1:] - centre[:-1]).T)
+                        + np.abs(spread[1:] - spread[:-1])) * FPS
+            move[move > MAX_SPEED] = np.nan           # a track dropping in or out, not movement
+            total += move
+    return total / 2
+
+
+def largest_group(players, radius=GROUP_RADIUS_M, chunk=20000):
+    """Most players within radius metres of any one player (a wall, a corner, a crowd at a
+    free kick), divided by the number tracked."""
+    pos = players * np.array(PITCH, dtype=np.float32)
+    out = np.full(len(players), np.nan)
+    for start in range(0, len(players), chunk):
+        p = pos[start:start + chunk]
+        dist = np.hypot(p[:, :, None, 0] - p[:, None, :, 0], p[:, :, None, 1] - p[:, None, :, 1])
+        near = np.sum(dist < radius, axis=2)                  # NaN compares False
+        tracked = np.sum(np.isfinite(p[:, :, 0]), axis=1)
+        out[start:start + chunk] = np.where(tracked > 0, near.max(axis=1) / np.maximum(tracked, 1),
+                                            np.nan)
+    return out
+
+
+def standing_at_touchline(players, speed):
+    """1 if a slow player stands on or just beyond a touchline (taking or waiting for a throw-in)."""
+    y = players[:, :, 1] * PITCH[1]
+    at_line = (y < TOUCHLINE_M) | (y > PITCH[1] - TOUCHLINE_M)
+    return np.any(at_line & (speed < STANDING_SPEED), axis=1).astype(np.float64)
 
 
 def features(tracking):
@@ -230,4 +278,5 @@ class DeadBallB:
 
 
 def frame_features_names():
-    return ("median_speed", "fast_speed", "walking", "sprinting", "ball_out", "ball_still")
+    return ("median_speed", "fast_speed", "walking", "sprinting", "shape_moving", "gathered",
+            "at_touchline", "ball_out", "ball_still")
