@@ -113,6 +113,11 @@ def calibrate(path):
                                                      for v in fast) / share)
     # A median fragment of m seconds means a break roughly every m seconds.
     CUTS_PER_MINUTE = 60.0 / max(stats["fragment_quantiles_s"]["50"], 1.0)
+    # Position wobble, when measured. Metrica's own tracking is much smoother, so adding the
+    # measured amount on top is close to the real total.
+    global BALL_JITTER_M, PLAYER_JITTER_M
+    BALL_JITTER_M = stats.get("ball_jitter_m", BALL_JITTER_M)
+    PLAYER_JITTER_M = stats.get("player_jitter_m", PLAYER_JITTER_M)
     return stats
 
 

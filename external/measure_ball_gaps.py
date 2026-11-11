@@ -25,6 +25,7 @@ sys.path.insert(0, ROOT)
 sys.path.insert(0, os.path.join(ROOT, "starter"))
 from games import GAME, GAMES, half_video_blocks, require, source_frames  # noqa: E402
 import load_smart_tagging  # noqa: E402
+from models.touch import touch_strength  # noqa: E402
 
 # Params
 OUT_PATH = os.path.join(ROOT, "data", "ball_gap_stats.json")
@@ -38,6 +39,7 @@ CROWD_RADIUS = 3.0                                        # metres
 NEAR_GOAL = 0.17                                          # x within ~18 m of either goal line
 NEAR_TOUCHLINE = 0.10                                     # y within ~7 m of either touchline
 SET_PIECE_MARGIN_S = 5.0                                  # a gap "ends at" a set piece this close
+STRENGTH_QUANTILES = (50, 75, 90, 95, 99)
 
 
 def read_atd(raw_path, n_frames, n_slots):
@@ -87,6 +89,19 @@ def hazard_ratios(values, bins, seen, gap_starts):
         out["{}-{}".format(low, high)] = {"ratio": rate / overall if overall else 0.0,
                                           "share_of_frames": frames / float(seen.sum())}
     return out
+
+
+def wobble_m(xy, pitch):
+    """Typical frame-to-frame position error in metres (one axis), from the second difference.
+
+    For a smoothly moving object x[t+1] - 2x[t] + x[t-1] is close to zero, so what's left is
+    tracking error: with independent errors of size s per frame its spread is sqrt(6) * s. The
+    median keeps real kicks and bounces, which are rare, from counting.
+    """
+    pos = xy * np.array(pitch, dtype=np.float32)
+    second = (pos[2:] - 2 * pos[1:-1] + pos[:-2]).reshape(-1)
+    second = np.abs(second[np.isfinite(second)])
+    return float(np.median(second) / 0.6745 / np.sqrt(6)) if len(second) else float("nan")
 
 
 def stoppage_share(gaps, graded, game, data_dir):
@@ -142,6 +157,12 @@ def measure(game=GAME, data_dir=None):
     present = ~np.isnan(players[:, :, 0]) & graded[:, None]
     fragments = np.array([b - a for slot in range(n_slots) for a, b in runs(present[:, slot])])
 
+    # Jitter: how much positions wobble, and the touch signal the model sees (same formula).
+    ball_graded = np.where(graded[:, None], ball, np.nan)
+    players_graded = np.where(graded[:, None, None], players, np.nan)
+    strength = touch_strength(ball_graded)
+    strength = strength[np.isfinite(strength)]
+
     return {
         "game": game,
         "graded_frames": int(graded.sum()),
@@ -162,6 +183,10 @@ def measure(game=GAME, data_dir=None):
         "track_fragments": int(len(fragments)),
         "fragment_quantiles_s": {str(q): float(np.percentile(fragments, q) / FPS)
                                  for q in GAP_QUANTILES},
+        "ball_jitter_m": wobble_m(ball_graded, pitch),
+        "player_jitter_m": wobble_m(players_graded, pitch),
+        "touch_strength_quantiles": {str(q): float(np.percentile(strength, q))
+                                     for q in STRENGTH_QUANTILES},
     }
 
 
@@ -187,6 +212,10 @@ def show(stats):
         stats["objects_per_frame"], stats["track_slots"], stats["track_fragments"]))
     print("fragment length (s), percentiles: " + "  ".join(
         "p{} {:.1f}".format(q, v) for q, v in stats["fragment_quantiles_s"].items()))
+    print("jitter (m per frame): ball {:.3f}, players {:.3f}".format(
+        stats["ball_jitter_m"], stats["player_jitter_m"]))
+    print("velocity change over 0.16 s (m/s), percentiles: " + "  ".join(
+        "p{} {:.1f}".format(q, v) for q, v in stats["touch_strength_quantiles"].items()))
 
 
 def main():
