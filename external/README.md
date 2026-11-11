@@ -62,3 +62,40 @@ We avoid it in three ways, together:
 
 * **2D ball:** a high ball passes straight through the positions of the players it flies over. Being near the ball is not a touch. A touch shows up as a sudden change in the ball's speed or direction.
 * **Clean tracking:** these games are much cleaner than ours, so scores on them are too optimistic until the noise is added.
+
+# Sealed test set: the DFL / Bundesliga open dataset
+
+Seven official matches (2 Bundesliga, 5 2. Bundesliga, 2022/23), with the league's own in-stadium tracking at 25 fps and official event data. **A sealed test: nothing is fitted or tuned on it.** It is scored only on the 2–3 final candidates, around Nov 14–15, and nobody looks at a real model's DFL score before then.
+
+**Licence: CC BY 4.0**, confirmed on the Figshare record (checked 2026-11-11). We use it unchanged for research and keep it out of git (`data/` is gitignored); only code and scores are published.
+
+**Citation:** Bassek, M., Rein, R., Weber, H., & Memmert, D. (2025). An integrated dataset of spatiotemporal and event data in elite soccer. *Scientific Data*, 12, 195. https://doi.org/10.1038/s41597-025-04505-y. Data: Bassek, Rein, Weber, Memmert (2025), figshare, https://doi.org/10.6084/m9.figshare.28196177.v1. Data owner: Deutsche Fußball Liga (DFL).
+
+```bash
+.venv/bin/python external/dfl_tracking.py      # download (MD5-checked), convert, check: {match}_tracking.npz
+.venv/bin/python external/dfl_sync.py          # event sync report (development matches)
+.venv/bin/python external/dfl_labels.py        # answer key; add --restart kick for the kick key
+.venv/bin/python external/dfl_noise.py --calibration data/ball_gap_stats.json   # live20/35/50, seed 0
+.venv/bin/python evaluation/score_external.py --sealed --oracle                 # must print PASS
+.venv/bin/python evaluation/score_external.py --sealed --model <finalist> --confirm-milestone
+```
+
+Everything lives in `data/external/dfl/`. Tracking rows are not DFL frame numbers: row 0 is empty, then the first half, one empty row, then the second half (DFL numbers them from 10000 and 100000).
+
+## What differs from Metrica, and how we handled it
+
+* **Event clock.** DFL's events come from a live manual log: they lag the tracking by −1.5 to +1.5 s per half and scatter by about ±0.7 s each. `dfl_sync.py` snaps every touch to the largest ball-velocity change next to the named player, in logged order. The method was fixed on 2 development matches and frozen (commit b79114c) before the 5 holdout matches were run once. Main test, which the snap never reads: is the first player to reach a completed pass its logged recipient? Development 82%, holdout 83.5% (80–87% per match), Metrica 83–84%; 3–7% of touches can't be placed and keep a lag-corrected time (about ±1 s).
+* **No ball-out event.** D starts where the tracked ball reaches a line. J03WQQ's tracking often stops the ball short of the line; there, and wherever no crossing is found, D starts at DFL's decision time minus the typical gap for that restart type (throw-in 0.5 s, goal kick 2.0 s, corner 2.2 s).
+* **Fouls and offsides** start D at the lag-corrected event (±0.7 s), or after the last logged touch when advantage was played. **Drop balls**: 1 s after the last touch (a guess; nothing marks the stoppage).
+* **Ball in stoppages.** DFL tracks it; Metrica's clean data mostly doesn't. The noisy copies delete it on dead frames first, then apply exactly the Metrica noise (same calibration).
+* **Unlogged touches** can't switch possession; the switch comes at the next logged touch, as in Metrica.
+* **More dead time** in four matches (0.42–0.53, Metrica 0.33–0.43) and more, shorter possessions. DFL's own per-frame ball status shows the same, so it is the matches, not our rules. Our key agrees with DFL's own per-frame columns (`dfl_provider`, comparison only) on 86–91% of frames.
+* **Video check (optional).** `dfl_video_check.md` lists the build-up to all 19 goals with game-clock times, to time touch gaps against public highlights. It measures the frozen sync; nothing is tuned on it.
+
+# PFF FC World Cup 2022 (paused; optional second sealed set)
+
+Broadcast tracking and events for the 64 matches, free on request via PFF FC's form, delivered as a Google Drive folder (`data/external/pff/`, gitignored; 21 games downloaded, 2 complete so far).
+
+**Licence:** no dataset-specific terms were found in the request form, the Drive folder or PFF's release posts. PFF's general Terms of Use (pff.com/terms) limit PFF data to personal, non-commercial use. Jordan decided on 2026-11-11 to proceed; no PFF data is committed or redistributed, only code and scores.
+
+**Warning: never use PFF's smoothed fields.** `ballsSmoothed` (what kloppy reads) puts the ball exactly on the player PFF's analysts logged as on the ball, on 98–99% of those frames (DFL: 0.1%). That is the answer key leaking into the input. `external/pff_tracking.py` reads the raw `balls`, `homePlayers` and `awayPlayers`; with them, PFF's events lag the tracking by a steady 0.2–0.3 s.
