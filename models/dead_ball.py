@@ -283,36 +283,50 @@ def to_dead(prob, threshold, min_dead_s, min_live_s):
     return clean_runs(prob > threshold, int(min_dead_s * FPS), int(min_live_s * FPS))
 
 
-# -- the model ----------------------------------------------------------------------------------
+# -- the detector, usable from any model ------------------------------------------------------
 
-class DeadBallB:
-    name = "dead_ball_players"
+class DeadBallDetector:
+    """Dead or alive per frame, from the players (and the ball when visible).
+
+        detector = DeadBallDetector()
+        detector.fit(train)                 # train: list of (tracking, labels), as in fit()
+        dead = detector.dead_mask(tracking)  # bool per frame; True = dead ball
+
+    fit() learns the regression, the threshold and minimum run lengths, and the longest ball gap
+    to fill. The threshold and run lengths are picked by spellF1 of base_predict's labels with
+    the dead frames set to D, so pass your own model's predict to tune them for it (default:
+    baseline B). Short ball gaps are filled inside the detector only; the caller's tracking is
+    never changed.
+    """
 
     def __init__(self):
-        self.base = NeverDead()
         self.mean = self.std = self.weights = self.bias = None
         self.post = {"threshold": 0.5, "min_dead_s": 3, "min_live_s": 3}
         self.max_gap = 0
 
     def settings(self):
-        return {"base": self.base.name, "windows_s": WINDOWS_S, "side_window_s": SIDE_WINDOW_S,
-                "l2": L2, "max_gap_frames": self.max_gap, "carry_radius_m": CARRY_RADIUS_M,
+        return {"windows_s": WINDOWS_S, "side_window_s": SIDE_WINDOW_S, "l2": L2,
+                "max_gap_frames": self.max_gap, "carry_radius_m": CARRY_RADIUS_M,
                 "inputs": list(frame_features_names()), "post": self.post,
                 "post_grid": {"threshold": THRESHOLDS, "min_dead_s": MIN_DEAD_S,
                               "min_live_s": MIN_LIVE_S}}
 
-    def dead_probability(self, X):
+    def dead_probability(self, tracking):
+        X = features(fill_ball_gaps(tracking, self.max_gap))
         Z = (X - self.mean) / self.std
         Z = np.where(np.isfinite(Z), Z, 0.0)       # unmeasured = the training average
         return 1.0 / (1.0 + np.exp(-(Z @ self.weights + self.bias)))
 
-    def fit(self, train):
-        # 0. How long a gap can be filled, then fill the training games the same way as predict()
+    def dead_mask(self, tracking):
+        return to_dead(self.dead_probability(tracking), **self.post) | (tracking["period"] == 0)
+
+    def fit(self, train, base_predict=None):
+        base_predict = base_predict or NeverDead().predict
+        # 0. How long a gap can be filled (dead_probability fills gaps the same way)
         self.max_gap = learn_max_gap([tracking for tracking, _ in train])
-        train = [(fill_ball_gaps(tracking, self.max_gap), labels) for tracking, labels in train]
 
         # 1. Regression on every FIT_STEP-th frame inside a half
-        feats = [features(tracking) for tracking, _ in train]
+        feats = [features(fill_ball_gaps(tracking, self.max_gap)) for tracking, _ in train]
         rows = [(np.arange(len(labels)) % FIT_STEP == 0) & (tracking["period"] > 0)
                 & (labels != pm.X) for (tracking, labels) in train]
         X = np.concatenate([f[r] for f, r in zip(feats, rows)])
@@ -323,30 +337,43 @@ class DeadBallB:
         self.weights, self.bias = fit_logistic(Z, y.astype(np.float64))
 
         # 2. Threshold and minimum run lengths: best mean spellF1 on the training games
-        probs = [self.dead_probability(f) for f in feats]
-        bases = [self.base.predict(tracking) for tracking, _ in train]
+        probs = [self.dead_probability(tracking) for tracking, _ in train]
+        bases = [base_predict(tracking) for tracking, _ in train]
         best = -1.0
         for threshold, min_dead, min_live in itertools.product(THRESHOLDS, MIN_DEAD_S, MIN_LIVE_S):
+            post = {"threshold": threshold, "min_dead_s": min_dead, "min_live_s": min_live}
             score = np.mean([
-                pm.evaluate(labels, pm.label_codes(self.combine(base, prob, tracking,
-                                                                threshold, min_dead, min_live)))
+                pm.evaluate(labels, pm.label_codes(with_dead(base, to_dead(prob, **post), tracking)))
                 ["spell_f1_mean"]
                 for (tracking, labels), base, prob in zip(train, bases, probs)])
             if score > best:
-                best = score
-                self.post = {"threshold": threshold, "min_dead_s": min_dead, "min_live_s": min_live}
+                best, self.post = score, post
 
-    @staticmethod
-    def combine(base, prob, tracking, threshold, min_dead_s, min_live_s):
-        labels = base.copy()
-        labels[to_dead(prob, threshold, min_dead_s, min_live_s)] = "D"
-        labels[tracking["period"] == 0] = "D"
-        return labels
+
+def with_dead(labels, dead, tracking):
+    """labels with D on dead frames and outside the halves."""
+    labels = labels.copy()
+    labels[dead | (tracking["period"] == 0)] = "D"
+    return labels
+
+
+# -- the model: baseline B plus the detector ---------------------------------------------------
+
+class DeadBallB:
+    name = "dead_ball_players"
+
+    def __init__(self):
+        self.base = NeverDead()
+        self.detector = DeadBallDetector()
+
+    def settings(self):
+        return dict(self.detector.settings(), base=self.base.name)
+
+    def fit(self, train):
+        self.detector.fit(train, self.base.predict)
 
     def predict(self, tracking):
-        tracking = fill_ball_gaps(tracking, self.max_gap)
-        prob = self.dead_probability(features(tracking))
-        return self.combine(self.base.predict(tracking), prob, tracking, **self.post)
+        return with_dead(self.base.predict(tracking), self.detector.dead_mask(tracking), tracking)
 
 
 def frame_features_names():
