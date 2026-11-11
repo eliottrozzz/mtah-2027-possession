@@ -22,7 +22,8 @@ for t in B C; do
   ln -s "/Users/Bucha/Side Projects/mtah-2027-possession/.venv" ../mtah-track$t/.venv
   mkdir -p ../mtah-track$t/.claude
   cat > ../mtah-track$t/.claude/settings.local.json <<'EOF'
-{ "permissions": { "deny": [
+{ "env": { "MTAH_DATA_DIR": "/nonexistent" },
+  "permissions": { "deny": [
   "Read(//Users/Bucha/Library/CloudStorage/**)",
   "Bash(*CloudStorage*)",
   "Bash(*MTAH_DATA_DIR*)"
@@ -33,12 +34,19 @@ done
 cp data/ball_gap_stats.json ../mtah-trackC/data/
 ```
 
-Then open **one terminal per track** and start Claude **without** the match data path:
+Then open **each worktree as its own VS Code window** and start a Claude session there. Never
+open an agent on `mtah-2027-possession` itself: sessions sharing one folder switch branches under
+each other.
 
 ```bash
-cd "/Users/Bucha/Side Projects/mtah-trackB" && env -u MTAH_DATA_DIR claude
-cd "/Users/Bucha/Side Projects/mtah-trackC" && env -u MTAH_DATA_DIR claude
+code "/Users/Bucha/Side Projects/mtah-trackB"
+code "/Users/Bucha/Side Projects/mtah-trackC"
 ```
+
+(In a plain terminal instead: `cd` into the worktree and run `env -u MTAH_DATA_DIR claude`.)
+The settings file above points `MTAH_DATA_DIR` at nothing and blocks the Drive folder, so the agent
+can't reach the match data even by accident. To check, ask the agent to run `echo $MTAH_DATA_DIR`;
+it should print `/nonexistent`.
 
 Paste the brief below into each one. Look in on them every hour or two; they'll ask before pushing.
 
