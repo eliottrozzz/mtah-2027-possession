@@ -31,11 +31,15 @@ FPS = 25
 PITCH = np.array((105.0, 68.0), dtype=np.float32)
 WINDOW = 4                       # frames each side used to measure velocity (0.16 s)
 GRID = {
-    "min_strength": (5.0, 7.0, 9.0, 12.0),     # m/s change in velocity
-    "radius_m": (1.5, 2.5, 3.5),
-    "deflection_s": (0.0, 0.4, 0.8),
+    "min_strength": (3.0, 4.0, 5.0, 7.0),      # m/s change in velocity
+    "radius_m": (1.0, 1.5, 2.0, 2.5),
+    # Fixed at 0.5 s, a rule decision, not tuned: the public ground truth counts single touches of
+    # about 0.8 s as real possessions, so the window must stay well below that (touch timing is
+    # only known to about +-0.16 s). Metrica prefers 0.8 s, but its events log fewer quick touches
+    # than the organisers do. Scores for 0.4-0.6 s were within 0.003. Decided 2026-11-11.
+    "deflection_s": (0.5,),
 }
-DEFAULTS = {"min_strength": 7.0, "radius_m": 2.5, "deflection_s": 0.4}
+DEFAULTS = {"min_strength": 7.0, "radius_m": 2.5, "deflection_s": 0.5}
 
 
 def touch_strength(ball, window=WINDOW):
