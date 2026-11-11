@@ -1,0 +1,210 @@
+{
+ "model": "baseline_noball_dead",
+ "spec": "models.baselines:NoBallDead",
+ "settings": {
+  "switch_s": 0.5,
+  "no_ball": "D"
+ },
+ "seed": 0,
+ "who": "claude",
+ "note": "baseline A: no ball = dead",
+ "time": "2026-11-11T00:49:34",
+ "branch": "jordan/scoring",
+ "commit": "ed8c3ba9fcc8364e5da2665964032ea0382b1154",
+ "dirty": false,
+ "headline": 0.1494492754027643,
+ "per_game": {
+  "1": 0.16207636294846928,
+  "2": 0.15071557358575613,
+  "3": 0.1355558896740674
+ },
+ "cells": {
+  "1": {
+   "reception": {
+    "20": {
+     "spell_f1": 0.1803979366249079,
+     "macro_f1": 0.6582105011209319,
+     "n_gt_spells": 334,
+     "n_pred_spells": 1023,
+     "spell_f1_range": [
+      0.16063375092114962,
+      0.19778924097273393
+     ]
+    },
+    "35": {
+     "spell_f1": 0.14375478927203064,
+     "macro_f1": 0.5600110891000251,
+     "n_gt_spells": 334,
+     "n_pred_spells": 971,
+     "spell_f1_range": [
+      0.127816091954023,
+      0.1615632183908046
+     ]
+    },
+    "50": {
+     "spell_f1": 0.12767402376910017,
+     "macro_f1": 0.4840351872248105,
+     "n_gt_spells": 334,
+     "n_pred_spells": 844
+    },
+    "clean": {
+     "spell_f1": 0.25792811839323465,
+     "macro_f1": 0.8441477065177377,
+     "n_gt_spells": 334,
+     "n_pred_spells": 1085
+    }
+   },
+   "kick": {
+    "20": {
+     "spell_f1": 0.18847556528081694,
+     "macro_f1": 0.6723827147405336,
+     "n_gt_spells": 348,
+     "n_pred_spells": 1023
+    },
+    "35": {
+     "spell_f1": 0.1473843821076573,
+     "macro_f1": 0.5734847288242024,
+     "n_gt_spells": 348,
+     "n_pred_spells": 971
+    },
+    "50": {
+     "spell_f1": 0.1338926174496644,
+     "macro_f1": 0.4995323689897804,
+     "n_gt_spells": 348,
+     "n_pred_spells": 844
+    },
+    "clean": {
+     "spell_f1": 0.2674110258199581,
+     "macro_f1": 0.8574367187420536,
+     "n_gt_spells": 348,
+     "n_pred_spells": 1085
+    }
+   }
+  },
+  "2": {
+   "reception": {
+    "20": {
+     "spell_f1": 0.1586206896551724,
+     "macro_f1": 0.630114061594576,
+     "n_gt_spells": 297,
+     "n_pred_spells": 1037,
+     "spell_f1_range": [
+      0.14083958020989504,
+      0.17211394302848576
+     ]
+    },
+    "35": {
+     "spell_f1": 0.14281045751633986,
+     "macro_f1": 0.558647044219753,
+     "n_gt_spells": 297,
+     "n_pred_spells": 927,
+     "spell_f1_range": [
+      0.12772875816993462,
+      0.15887254901960784
+     ]
+    },
+    "50": {
+     "spell_f1": 0.12812500000000002,
+     "macro_f1": 0.5131845942245647,
+     "n_gt_spells": 297,
+     "n_pred_spells": 855
+    },
+    "clean": {
+     "spell_f1": 0.23666910153396642,
+     "macro_f1": 0.8690807361266074,
+     "n_gt_spells": 297,
+     "n_pred_spells": 1072
+    }
+   },
+   "kick": {
+    "20": {
+     "spell_f1": 0.16782802075611564,
+     "macro_f1": 0.6447967401873805,
+     "n_gt_spells": 312,
+     "n_pred_spells": 1037
+    },
+    "35": {
+     "spell_f1": 0.14947538337368846,
+     "macro_f1": 0.5754072552462787,
+     "n_gt_spells": 312,
+     "n_pred_spells": 927
+    },
+    "50": {
+     "spell_f1": 0.13641816623821765,
+     "macro_f1": 0.5326308600981647,
+     "n_gt_spells": 312,
+     "n_pred_spells": 855
+    },
+    "clean": {
+     "spell_f1": 0.24855491329479767,
+     "macro_f1": 0.8837840958911279,
+     "n_gt_spells": 312,
+     "n_pred_spells": 1072
+    }
+   }
+  },
+  "3": {
+   "reception": {
+    "20": {
+     "spell_f1": 0.1471604938271605,
+     "macro_f1": 0.6274004559461863,
+     "n_gt_spells": 366,
+     "n_pred_spells": 1254,
+     "spell_f1_range": [
+      0.13307407407407404,
+      0.1595185185185185
+     ]
+    },
+    "35": {
+     "spell_f1": 0.12395128552097427,
+     "macro_f1": 0.5577132861391093,
+     "n_gt_spells": 366,
+     "n_pred_spells": 1112,
+     "spell_f1_range": [
+      0.11039242219215155,
+      0.1385791610284168
+     ]
+    },
+    "50": {
+     "spell_f1": 0.10660660660660659,
+     "macro_f1": 0.4607541471682213,
+     "n_gt_spells": 366,
+     "n_pred_spells": 966
+    },
+    "clean": {
+     "spell_f1": 0.20376068376068374,
+     "macro_f1": 0.847889941896364,
+     "n_gt_spells": 366,
+     "n_pred_spells": 1389
+    }
+   },
+   "kick": {
+    "20": {
+     "spell_f1": 0.15348837209302327,
+     "macro_f1": 0.6428435728563152,
+     "n_gt_spells": 380,
+     "n_pred_spells": 1254
+    },
+    "35": {
+     "spell_f1": 0.12922252010723861,
+     "macro_f1": 0.5733777947088535,
+     "n_gt_spells": 380,
+     "n_pred_spells": 1112
+    },
+    "50": {
+     "spell_f1": 0.1188707280832095,
+     "macro_f1": 0.47558454396747024,
+     "n_gt_spells": 380,
+     "n_pred_spells": 966
+    },
+    "clean": {
+     "spell_f1": 0.21639344262295085,
+     "macro_f1": 0.8663712299496815,
+     "n_gt_spells": 380,
+     "n_pred_spells": 1389
+    }
+   }
+  }
+ },
+ "keep_rule": null
+}
