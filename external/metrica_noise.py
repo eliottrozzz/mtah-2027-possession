@@ -44,6 +44,8 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)
 import metrica_labels as ml  # noqa: E402
 import metrica_tracking as mt  # noqa: E402
+sys.path.insert(0, os.path.dirname(HERE))
+from models.touch import touch_strength  # noqa: E402  (the same touch signal the model reads)
 
 # Params
 OUT_DIR = os.path.join(mt.OUT_DIR, "noisy")
@@ -72,9 +74,18 @@ NEAR_TOUCHLINE = 0.10
 # Ball during stoppages.
 DEAD_VISIBLE_PROB = 0.5        # chance a stoppage shows a still ball for part of it
 
-# Jitter, metres.
+# Jitter, metres: independent wobble on every frame.
 BALL_JITTER_M = 0.3
 PLAYER_JITTER_M = 0.15
+
+# Smoothing. The provided tracking barely wobbles (about 0.003 m per frame) but is smoothed over
+# time, which blurs every kick: its velocity change over 0.16 s is under 6 m/s 99% of the time.
+# So, when calibrated, the ball is smoothed over BALL_SMOOTH_FRAMES and gets a slow wobble of
+# BALL_WOBBLE_M, both picked so Metrica's touch signal matches the measured percentiles.
+BALL_SMOOTH_FRAMES = 1         # 1 = no smoothing (uncalibrated default)
+BALL_WOBBLE_M = 0.0
+SMOOTH_CANDIDATES = (1, 5, 9, 11, 13, 15, 17, 19, 21, 25, 29, 33)
+WOBBLE_CANDIDATES = (0.0, 0.05, 0.1, 0.15, 0.2, 0.3, 0.4, 0.6, 0.8)
 
 # Players.
 CUTS_PER_MINUTE = 2.0          # random breaks per player
@@ -115,10 +126,70 @@ def calibrate(path):
     CUTS_PER_MINUTE = 60.0 / max(stats["fragment_quantiles_s"]["50"], 1.0)
     # Position wobble, when measured. Metrica's own tracking is much smoother, so adding the
     # measured amount on top is close to the real total.
-    global BALL_JITTER_M, PLAYER_JITTER_M
+    global BALL_JITTER_M, PLAYER_JITTER_M, BALL_SMOOTH_FRAMES, BALL_WOBBLE_M
     BALL_JITTER_M = stats.get("ball_jitter_m", BALL_JITTER_M)
     PLAYER_JITTER_M = stats.get("player_jitter_m", PLAYER_JITTER_M)
+    if "touch_strength_quantiles" in stats:
+        BALL_SMOOTH_FRAMES, BALL_WOBBLE_M = match_touch_signal(stats["touch_strength_quantiles"])
     return stats
+
+
+def smooth(xy, frames):
+    """Moving average over `frames` frames, ignoring missing ones; NaN where most are missing."""
+    if frames <= 1:
+        return xy
+    kernel = np.ones(frames) / frames
+    out = np.full(xy.shape, np.nan, dtype=np.float64)
+    for axis in range(xy.shape[1]):
+        values = xy[:, axis].astype(np.float64)
+        ok = np.isfinite(values)
+        total = np.convolve(np.where(ok, values, 0.0), kernel, "same")
+        weight = np.convolve(ok.astype(np.float64), kernel, "same")
+        out[:, axis] = np.where(ok & (weight > 0.5), total / np.maximum(weight, 1e-9), np.nan)
+    return out.astype(np.float32)
+
+
+def slow_wobble(n, frames, metres_sd, rng):
+    """Smoothed random wobble with a spread of about metres_sd, in 0-1 pitch units."""
+    if metres_sd <= 0:
+        return np.zeros((n, 2), dtype=np.float32)
+    white = rng.normal(0.0, 1.0, (n, 2)) * metres_sd * np.sqrt(max(frames, 1))
+    return (smooth(white, frames) / np.array(mt.PITCH)).astype(np.float32)
+
+
+def touch_quantiles(ball):
+    strength = touch_strength(ball)
+    strength = strength[np.isfinite(strength)]
+    return np.percentile(strength, [float(q) for q in sorted(QUANTILE_KEYS, key=float)])
+
+
+QUANTILE_KEYS = ("50", "75", "90", "95", "99")
+
+
+def match_touch_signal(target):
+    """(smoothing frames, wobble m) whose touch signal on Metrica game 1 best matches target.
+
+    Smoothing is matched on the upper percentiles (the kicks), then the wobble on all of them
+    (it mostly lifts the median). Distances are on a log scale so each percentile counts equally.
+    """
+    goal = np.array([target[q] for q in sorted(QUANTILE_KEYS, key=float)])
+    clean = mt.load_game(1)["ball"]
+
+    def miss(ball, upper_only):
+        got = touch_quantiles(ball)
+        err = np.abs(np.log(np.maximum(got, 1e-3) / goal))
+        return float(err[1:].sum() if upper_only else err.sum())
+
+    frames = min(SMOOTH_CANDIDATES, key=lambda f: miss(smooth(clean, f), True))
+    rng = np.random.default_rng(0)
+    wobble = {m: slow_wobble(len(clean), frames, m, rng) for m in WOBBLE_CANDIDATES}
+    smoothed = smooth(clean, frames)
+    metres_sd = min(WOBBLE_CANDIDATES, key=lambda m: miss(smoothed + wobble[m], False))
+    final = touch_quantiles(smoothed + wobble[metres_sd])
+    print("touch signal: smoothing {} frames ({:.2f} s), slow wobble {} m -> p50-p99 {} "
+          "(real {})".format(frames, frames / FPS, metres_sd, np.round(final, 1).tolist(),
+                             np.round(goal, 1).tolist()))
+    return frames, metres_sd
 
 
 def bin_ratio(values, ratios):
@@ -285,7 +356,9 @@ def make_noisy(game_no, level, seed):
     air = flights(game_no, game, live, rng)
     gaps = random_gaps(game, live, seen, level / 100.0, air, rng)
 
-    ball = game["ball"].copy()
+    # Smooth first, like a tracker does on the path it sees, then cut the gaps out of it.
+    ball = smooth(game["ball"], BALL_SMOOTH_FRAMES)
+    ball = ball + slow_wobble(n, BALL_SMOOTH_FRAMES, BALL_WOBBLE_M, rng)
     reason = np.where(seen, 0, 1).astype(np.int8)    # 0 seen, 1 missing in the clean data
     reason[seen & gaps] = 3                            # 3 random gap
     reason[seen & air] = 2                             # 2 ball in the air

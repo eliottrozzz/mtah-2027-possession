@@ -12,7 +12,7 @@ not enough (a high ball passes "through" players in 2D tracking), so a touch nee
     4. Before the first touch, and through gaps, possession carries forward. v1 never predicts D;
        dead balls come from the dead-ball detector (Track B), merged in separately.
 
-min_strength, radius_m and deflection_s are chosen in fit() by trying a small grid on the
+min_strength, radius_m and window are chosen in fit() by trying a small grid on the
 training games (external data only) and keeping the best spellF1.
 """
 
@@ -29,17 +29,21 @@ import possession_metrics as pm  # noqa: E402
 # Params
 FPS = 25
 PITCH = np.array((105.0, 68.0), dtype=np.float32)
-WINDOW = 4                       # frames each side used to measure velocity (0.16 s)
+WINDOW = 4                       # default frames each side (0.16 s); the model tunes its own
 GRID = {
-    "min_strength": (3.0, 4.0, 5.0, 7.0),      # m/s change in velocity
-    "radius_m": (1.0, 1.5, 2.0, 2.5),
+    # The provided tracking is smoothed over about 0.8 s, which blurs kicks into small velocity
+    # changes (under 6 m/s 99% of the time), so the ranges cover weak touches, longer measuring
+    # windows and a lagging ball.
+    "min_strength": (1.0, 1.5, 2.0, 3.0, 4.0),  # m/s change in velocity
+    "radius_m": (1.0, 1.5, 2.5, 3.5),
+    "window": (4, 8, 12),                        # frames each side (0.16, 0.32, 0.48 s)
     # Fixed at 0.5 s, a rule decision, not tuned: the public ground truth counts single touches of
     # about 0.8 s as real possessions, so the window must stay well below that (touch timing is
     # only known to about +-0.16 s). Metrica prefers 0.8 s, but its events log fewer quick touches
     # than the organisers do. Scores for 0.4-0.6 s were within 0.003. Decided 2026-11-11.
     "deflection_s": (0.5,),
 }
-DEFAULTS = {"min_strength": 7.0, "radius_m": 2.5, "deflection_s": 0.5}
+DEFAULTS = {"min_strength": 2.0, "radius_m": 2.5, "window": 8, "deflection_s": 0.5}
 
 
 def touch_strength(ball, window=WINDOW):
@@ -116,10 +120,11 @@ class LastTouch:
         self.params = dict(DEFAULTS, **params)
 
     def settings(self):
-        return dict(self.params, window=WINDOW)
+        return dict(self.params)
 
     def predict_with(self, tracking, params):
-        frames, teams = find_touches(tracking, params["min_strength"], params["radius_m"])
+        frames, teams = find_touches(tracking, params["min_strength"], params["radius_m"],
+                                     params["window"])
         frames, teams = drop_deflections(frames, teams, int(params["deflection_s"] * FPS))
         labels = possession_from_touches(len(tracking["ball"]), frames, teams)
         labels[tracking["period"] == 0] = "D"

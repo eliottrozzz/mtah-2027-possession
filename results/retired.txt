@@ -1,1 +1,4 @@
 20261111-111939_touch_v1_seed0.json  # deflection window 0.8 s erases the 0.8 s possessions the public ground truth counts; replaced by 0.5 s (decided 2026-11-11)
+20261111-004934_baseline_noball_dead_seed0.json  # scored on the old noisy copies (random 0.3 m wobble); the noise now copies the real tracking's smoothing (2026-11-11)
+20261111-004940_baseline_never_dead_seed0.json  # scored on the old noisy copies (random 0.3 m wobble); the noise now copies the real tracking's smoothing (2026-11-11)
+20261111-121729_touch_v1_seed0.json  # scored on the old noisy copies (random 0.3 m wobble); the noise now copies the real tracking's smoothing (2026-11-11)
