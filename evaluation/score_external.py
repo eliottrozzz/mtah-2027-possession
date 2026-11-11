@@ -25,10 +25,13 @@ Each run writes one file to results/runs/ (one per run, so parallel work doesn't
 """
 
 import argparse
+import concurrent.futures
+import contextlib
 import datetime
 import getpass
 import glob
 import importlib
+import io
 import json
 import os
 import subprocess
@@ -110,33 +113,73 @@ def score_cell(gt, pred, bootstrap):
     return cell
 
 
-def run(model, seed, levels):
-    """{game: {key: {level: cell}}} for every test game, plus the fitted settings."""
-    keys = {}
-    tracking = {}
-    for game in GAMES:
-        for level in levels:
-            tracking[game, level] = load_tracking(game, level, seed)
-        period = tracking[game, levels[0]]["period"]
-        keys[game] = {key: load_answer_key(game, key, period) for key in KEYS}
+def run_fold(model, test, seed, levels):
+    """Fit on the two other games, predict game `test` at every level. Returns that game's cells.
 
-    cells = {}
-    for test in GAMES:
-        train = [(tracking[g, level], keys[g][HEADLINE_KEY])
-                 for g in GAMES if g != test for level in TUNING_LEVELS]
-        model.fit(train)
-        cells[test] = {key: {} for key in KEYS}
-        for level in levels:
-            pred = model.predict(tracking[test, level])
-            for key in KEYS:
-                gt = keys[test][key]
-                if len(pred) != len(gt):
-                    raise ValueError("model returned {} frames, game {} has {}".format(
-                        len(pred), test, len(gt)))
-                bootstrap = key == HEADLINE_KEY and level in TUNING_LEVELS
-                cells[test][key][str(level)] = score_cell(gt, pred, bootstrap)
-        print("  game {} done".format(test))
+    Loads its own tracking, so a worker process never receives big arrays through pickling. Only
+    the training games and one test level are held in memory at a time.
+    """
+    train = []
+    for g in GAMES:
+        if g == test:
+            continue
+        for level in TUNING_LEVELS:
+            tracking = load_tracking(g, level, seed)
+            train.append((tracking, load_answer_key(g, HEADLINE_KEY, tracking["period"])))
+    model.fit(train)
+    del train
+
+    cells = {key: {} for key in KEYS}
+    gts = None
+    for level in levels:
+        tracking = load_tracking(test, level, seed)
+        if gts is None:
+            gts = {key: load_answer_key(test, key, load_tracking(test, levels[0], seed)["period"]
+                                        if level != levels[0] else tracking["period"])
+                   for key in KEYS}
+        pred = model.predict(tracking)
+        del tracking
+        for key in KEYS:
+            gt = gts[key]
+            if len(pred) != len(gt):
+                raise ValueError("model returned {} frames, game {} has {}".format(
+                    len(pred), test, len(gt)))
+            bootstrap = key == HEADLINE_KEY and level in TUNING_LEVELS
+            cells[key][str(level)] = score_cell(gt, pred, bootstrap)
     return cells
+
+
+def _fold_worker(spec, test, seed, levels):
+    """Process-pool entry: a fresh model, its printed output captured, and its fitted settings."""
+    buffer = io.StringIO()
+    with contextlib.redirect_stdout(buffer):
+        model = load_model(spec)
+        cells = run_fold(model, test, seed, levels)
+    return cells, buffer.getvalue(), model.settings()
+
+
+def run(spec, seed, levels, jobs=len(GAMES)):
+    """({game: {key: {level: cell}}} for every test game, the fitted settings).
+
+    jobs 1 scores the folds one after another with a single model instance. Otherwise each fold
+    runs in its own process with its own model instance; their printed output is replayed in game
+    order so the log looks the same. The settings are those of the last fold, as before.
+    """
+    cells = {}
+    if jobs <= 1:
+        model = load_model(spec)
+        for test in GAMES:
+            cells[test] = run_fold(model, test, seed, levels)
+            print("  game {} done".format(test))
+        return cells, model.settings()
+
+    with concurrent.futures.ProcessPoolExecutor(max_workers=min(jobs, len(GAMES))) as pool:
+        futures = {test: pool.submit(_fold_worker, spec, test, seed, levels) for test in GAMES}
+        for test in GAMES:
+            cells[test], output, settings = futures[test].result()
+            print(output, end="")
+            print("  game {} done".format(test))
+    return cells, settings
 
 
 def headline(cells):
@@ -175,9 +218,23 @@ def cells_from_log(entry):
     return {int(g): v for g, v in entry["cells"].items()}
 
 
+def retired_runs():
+    """Run files listed in results/retired.txt: versions we decided against for football reasons.
+
+    They stay in the log but are never the bar a new run has to beat. One file name per line,
+    then '#' and the reason.
+    """
+    path = os.path.join(ROOT, "results", "retired.txt")
+    if not os.path.exists(path):
+        return set()
+    with open(path) as handle:
+        return {line.split("#")[0].strip() for line in handle if line.split("#")[0].strip()}
+
+
 def keep_rule(cells, seed):
     """Compare against the best earlier run on the same seed. None if there is nothing to beat."""
-    earlier = load_runs(seed)
+    retired = retired_runs()
+    earlier = [e for e in load_runs(seed) if e["_file"] not in retired]
     if not earlier:
         return None
     best = max(earlier, key=lambda e: e["headline"])
@@ -219,12 +276,14 @@ def show(entry):
 def summary():
     for seed, title in ((0, "TUNING RUNS (seed 0)"), (1, "MILESTONE RUNS (seed 1)")):
         runs = sorted(load_runs(seed), key=lambda e: -e["headline"])
+        retired = retired_runs()
         print("\n" + title)
         if not runs:
             print("  none yet")
         for e in runs:
             rule = e.get("keep_rule") or {}
-            print("  {:.3f} ({})  {:<28} {:<10} {}  {}  {}".format(
+            print("{} {:.3f} ({})  {:<28} {:<10} {}  {}  {}".format(
+                "R" if e["_file"] in retired else " ",
                 e["headline"], " / ".join("{:.2f}".format(e["per_game"][str(g)]) for g in GAMES),
                 e["model"], e["who"], e["commit"][:7] + ("*" if e["dirty"] else ""),
                 e["time"][:16], "keep" if rule.get("keep") else ("-" if not rule else "no")))
@@ -237,6 +296,8 @@ def main():
                         help="0 = tuning (default), 1 = milestone test, run rarely")
     parser.add_argument("--note", default="", help="one line for the log")
     parser.add_argument("--who", default=getpass.getuser(), help="who ran it (person or agent)")
+    parser.add_argument("--jobs", type=int, default=len(GAMES),
+                        help="folds scored in parallel processes (default 3; 1 = one after another)")
     parser.add_argument("--no-log", action="store_true", help="print only, write nothing")
     parser.add_argument("--summary", action="store_true", help="print the log and stop")
     args = parser.parse_args()
@@ -250,11 +311,11 @@ def main():
     model = load_model(args.model)
     levels = list(TUNING_LEVELS) + list(STRESS_LEVELS) + list(INFO_LEVELS)
     print("scoring {} on seed {}".format(model.name, args.seed))
-    cells = run(model, args.seed, levels)
+    cells, settings = run(args.model, args.seed, levels, args.jobs)
     total, per_game = headline(cells)
 
     entry = {
-        "model": model.name, "spec": args.model, "settings": model.settings(),
+        "model": model.name, "spec": args.model, "settings": settings,
         "seed": args.seed, "who": args.who, "note": args.note,
         "time": datetime.datetime.now().isoformat(timespec="seconds"),
         "branch": git("rev-parse", "--abbrev-ref", "HEAD"), "commit": git("rev-parse", "HEAD"),
