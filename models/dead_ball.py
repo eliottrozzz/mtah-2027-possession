@@ -15,6 +15,8 @@ How it works:
   3. P(dead) is smoothed, thresholded, and short dead or live runs are removed. The threshold and
      minimum lengths are picked in fit() by spellF1 on the training games, never on test scores.
   4. Baseline B (nearest team, switch after 0.5 s, never dead) gives the team; dead frames get D.
+  Before all this, short ball gaps are filled where one player clearly carries the ball through
+  them (fill_ball_gaps). The longest gap to fill is learned in fit(); longer gaps stay missing.
 
     python evaluation/score_external.py --model models.dead_ball:DeadBallB --who agentB
 """
@@ -44,6 +46,9 @@ WINDOWS_S = (2, 8, 20)        # centred smoothing windows
 SIDE_WINDOW_S = 6             # windows just before and just after the frame
 FIT_STEP = 5                  # use every 5th frame to fit the regression (neighbours are alike)
 L2 = 1.0                      # ridge penalty on the regression weights
+CARRY_RADIUS_M = 2.0          # a player this close to the ball at both ends of a gap is carrying it
+GAP_CANDIDATES_S = (1, 2, 3, 4, 6)   # longest gap to fill, picked in fit() (see learn_max_gap)
+GAP_SAMPLES = 2000            # hidden stretches per candidate length when learning it
 # Post-processing candidates, chosen in fit() by spellF1 on the training games
 THRESHOLDS = (0.35, 0.45, 0.55, 0.65)
 MIN_DEAD_S = (2, 4, 8, 12)
@@ -174,6 +179,66 @@ def features(tracking):
     return np.column_stack(cols)
 
 
+# -- filling short ball gaps -------------------------------------------------------------------
+
+def carrier(players, ball, frame):
+    """Index of the player within CARRY_RADIUS_M of the ball at frame, or None."""
+    dist = np.hypot(*((players[frame] - ball[frame]) * np.array(PITCH)).T)
+    if not np.isfinite(dist).any() or np.nanmin(dist) > CARRY_RADIUS_M:
+        return None
+    return int(np.nanargmin(dist))
+
+
+def fill_gap(players, ball, start, end):
+    """The carrier's positions over ball[start:end] if one player is clearly carrying the ball
+    (near it just before and just after the gap, tracked throughout), else None."""
+    if start == 0 or end >= len(ball):
+        return None
+    who = carrier(players, ball, start - 1)
+    if who is None or carrier(players, ball, end) != who:
+        return None
+    path = players[start:end, who]
+    return path if np.isfinite(path).all() else None
+
+
+def fill_ball_gaps(tracking, max_gap_frames):
+    """Copy of tracking with gaps up to max_gap_frames filled where one player carries the ball.
+    Longer gaps, and gaps nobody clearly carries the ball through, stay missing."""
+    ball = tracking["ball"].copy()
+    for start, end in runs(np.isnan(ball[:, 0]) & (tracking["period"] > 0)):
+        if end - start <= max_gap_frames:
+            path = fill_gap(tracking["players"], tracking["ball"], start, end)
+            if path is not None:
+                ball[start:end] = path
+    return dict(tracking, ball=ball)
+
+
+def learn_max_gap(trackings, seed=0):
+    """Longest gap length (from GAP_CANDIDATES_S) where filling is still as accurate as "the ball is
+    at the carrier's feet": hide stretches of visible ball in the training games, fill them, and
+    keep a length only if the filled positions are typically within CARRY_RADIUS_M of the truth."""
+    rng = np.random.default_rng(seed)
+    best = 0
+    for seconds in GAP_CANDIDATES_S:
+        length = int(seconds * FPS)
+        errors = []
+        for tracking in trackings:
+            ball, players = tracking["ball"], tracking["players"]
+            seen = np.isfinite(ball[:, 0])
+            # stretches where the ball is visible for the hidden part and one frame either side
+            window = np.convolve(seen, np.ones(length + 2), mode="valid") == length + 2
+            starts = np.flatnonzero(window) + 1
+            for start in rng.choice(starts, min(GAP_SAMPLES, len(starts)), replace=False):
+                path = fill_gap(players, ball, start, start + length)
+                if path is not None:
+                    errors.append(np.hypot(*((path - ball[start:start + length]) * np.array(PITCH)).T))
+        if errors and np.median(np.concatenate(errors)) <= CARRY_RADIUS_M:
+            best = length
+        else:
+            break
+    return best
+
+
 # -- logistic regression ------------------------------------------------------------------------
 
 def fit_logistic(X, y, l2=L2, iters=25):
@@ -227,10 +292,12 @@ class DeadBallB:
         self.base = NeverDead()
         self.mean = self.std = self.weights = self.bias = None
         self.post = {"threshold": 0.5, "min_dead_s": 3, "min_live_s": 3}
+        self.max_gap = 0
 
     def settings(self):
         return {"base": self.base.name, "windows_s": WINDOWS_S, "side_window_s": SIDE_WINDOW_S,
-                "l2": L2, "inputs": list(frame_features_names()), "post": self.post,
+                "l2": L2, "max_gap_frames": self.max_gap, "carry_radius_m": CARRY_RADIUS_M,
+                "inputs": list(frame_features_names()), "post": self.post,
                 "post_grid": {"threshold": THRESHOLDS, "min_dead_s": MIN_DEAD_S,
                               "min_live_s": MIN_LIVE_S}}
 
@@ -240,6 +307,10 @@ class DeadBallB:
         return 1.0 / (1.0 + np.exp(-(Z @ self.weights + self.bias)))
 
     def fit(self, train):
+        # 0. How long a gap can be filled, then fill the training games the same way as predict()
+        self.max_gap = learn_max_gap([tracking for tracking, _ in train])
+        train = [(fill_ball_gaps(tracking, self.max_gap), labels) for tracking, labels in train]
+
         # 1. Regression on every FIT_STEP-th frame inside a half
         feats = [features(tracking) for tracking, _ in train]
         rows = [(np.arange(len(labels)) % FIT_STEP == 0) & (tracking["period"] > 0)
@@ -273,6 +344,7 @@ class DeadBallB:
         return labels
 
     def predict(self, tracking):
+        tracking = fill_ball_gaps(tracking, self.max_gap)
         prob = self.dead_probability(features(tracking))
         return self.combine(self.base.predict(tracking), prob, tracking, **self.post)
 
