@@ -1,0 +1,218 @@
+{
+ "model": "touch_v1",
+ "spec": "models.touch:LastTouch",
+ "settings": {
+  "min_strength": 1.0,
+  "radius_m": 3.5,
+  "window": 12,
+  "deflection_s": 0.5
+ },
+ "seed": 0,
+ "who": "claude",
+ "note": "re-scored on smoothed noise",
+ "time": "2026-11-11T12:29:48",
+ "branch": "jordan/scoring",
+ "commit": "3c148159fe222e6f0d09763b6d52441a93c49df8",
+ "dirty": false,
+ "headline": 0.35842882303844853,
+ "per_game": {
+  "1": 0.36447625243981774,
+  "2": 0.33927106227106224,
+  "3": 0.37153915440446567
+ },
+ "cells": {
+  "1": {
+   "reception": {
+    "20": {
+     "spell_f1": 0.37492163009404383,
+     "macro_f1": 0.40635754339047453,
+     "n_gt_spells": 334,
+     "n_pred_spells": 304,
+     "spell_f1_range": [
+      0.33084639498432594,
+      0.4163636363636364
+     ]
+    },
+    "35": {
+     "spell_f1": 0.3540308747855917,
+     "macro_f1": 0.3882187997101056,
+     "n_gt_spells": 334,
+     "n_pred_spells": 249,
+     "spell_f1_range": [
+      0.3087135506003431,
+      0.40343053173241855
+     ]
+    },
+    "50": {
+     "spell_f1": 0.27785714285714286,
+     "macro_f1": 0.3636819169221737,
+     "n_gt_spells": 334,
+     "n_pred_spells": 226
+    },
+    "clean": {
+     "spell_f1": 0.5529411764705883,
+     "macro_f1": 0.4340252575614237,
+     "n_gt_spells": 334,
+     "n_pred_spells": 244
+    }
+   },
+   "kick": {
+    "20": {
+     "spell_f1": 0.37300613496932516,
+     "macro_f1": 0.41348715517469564,
+     "n_gt_spells": 348,
+     "n_pred_spells": 304
+    },
+    "35": {
+     "spell_f1": 0.34840871021775544,
+     "macro_f1": 0.39598393503215207,
+     "n_gt_spells": 348,
+     "n_pred_spells": 249
+    },
+    "50": {
+     "spell_f1": 0.2752613240418118,
+     "macro_f1": 0.37143512848981297,
+     "n_gt_spells": 348,
+     "n_pred_spells": 226
+    },
+    "clean": {
+     "spell_f1": 0.5371621621621621,
+     "macro_f1": 0.4356253730331945,
+     "n_gt_spells": 348,
+     "n_pred_spells": 244
+    }
+   }
+  },
+  "2": {
+   "reception": {
+    "20": {
+     "spell_f1": 0.354,
+     "macro_f1": 0.4130587519527449,
+     "n_gt_spells": 297,
+     "n_pred_spells": 303,
+     "spell_f1_range": [
+      0.31320000000000003,
+      0.39403333333333335
+     ]
+    },
+    "35": {
+     "spell_f1": 0.3245421245421245,
+     "macro_f1": 0.4092095712401365,
+     "n_gt_spells": 297,
+     "n_pred_spells": 249,
+     "spell_f1_range": [
+      0.28413919413919414,
+      0.37076923076923074
+     ]
+    },
+    "50": {
+     "spell_f1": 0.2388663967611336,
+     "macro_f1": 0.3819564439488215,
+     "n_gt_spells": 297,
+     "n_pred_spells": 197
+    },
+    "clean": {
+     "spell_f1": 0.5794871794871794,
+     "macro_f1": 0.4509567269846692,
+     "n_gt_spells": 297,
+     "n_pred_spells": 249
+    }
+   },
+   "kick": {
+    "20": {
+     "spell_f1": 0.34991869918699187,
+     "macro_f1": 0.42049614177868255,
+     "n_gt_spells": 312,
+     "n_pred_spells": 303
+    },
+    "35": {
+     "spell_f1": 0.3180035650623886,
+     "macro_f1": 0.41605498934972185,
+     "n_gt_spells": 312,
+     "n_pred_spells": 249
+    },
+    "50": {
+     "spell_f1": 0.23261296660117883,
+     "macro_f1": 0.3899099738708803,
+     "n_gt_spells": 312,
+     "n_pred_spells": 197
+    },
+    "clean": {
+     "spell_f1": 0.5632798573975044,
+     "macro_f1": 0.45465196139592257,
+     "n_gt_spells": 312,
+     "n_pred_spells": 249
+    }
+   }
+  },
+  "3": {
+   "reception": {
+    "20": {
+     "spell_f1": 0.3870604781997188,
+     "macro_f1": 0.4635769777790672,
+     "n_gt_spells": 366,
+     "n_pred_spells": 345,
+     "spell_f1_range": [
+      0.34863572433192686,
+      0.42481012658227846
+     ]
+    },
+    "35": {
+     "spell_f1": 0.35601783060921255,
+     "macro_f1": 0.44156453109410004,
+     "n_gt_spells": 366,
+     "n_pred_spells": 307,
+     "spell_f1_range": [
+      0.3178603268945023,
+      0.3952451708766716
+     ]
+    },
+    "50": {
+     "spell_f1": 0.287813021702838,
+     "macro_f1": 0.4159439429991763,
+     "n_gt_spells": 366,
+     "n_pred_spells": 233
+    },
+    "clean": {
+     "spell_f1": 0.6328725038402456,
+     "macro_f1": 0.5106002567347558,
+     "n_gt_spells": 366,
+     "n_pred_spells": 285
+    }
+   },
+   "kick": {
+    "20": {
+     "spell_f1": 0.3823448275862068,
+     "macro_f1": 0.4689833728461726,
+     "n_gt_spells": 380,
+     "n_pred_spells": 345
+    },
+    "35": {
+     "spell_f1": 0.35283842794759823,
+     "macro_f1": 0.4457691538696102,
+     "n_gt_spells": 380,
+     "n_pred_spells": 307
+    },
+    "50": {
+     "spell_f1": 0.27862969004893967,
+     "macro_f1": 0.42058236567292884,
+     "n_gt_spells": 380,
+     "n_pred_spells": 233
+    },
+    "clean": {
+     "spell_f1": 0.6051127819548873,
+     "macro_f1": 0.5098913707757283,
+     "n_gt_spells": 380,
+     "n_pred_spells": 285
+    }
+   }
+  }
+ },
+ "keep_rule": {
+  "against": "20261111-122848_baseline_never_dead_seed0.json",
+  "against_model": "baseline_never_dead",
+  "headline_gain": 0.19,
+  "drops_over_limit": {},
+  "keep": true
+ }
+}

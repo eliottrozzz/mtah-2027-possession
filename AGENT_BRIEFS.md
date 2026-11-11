@@ -48,7 +48,10 @@ The settings file above points `MTAH_DATA_DIR` at nothing and blocks the Drive f
 can't reach the match data even by accident. To check, ask the agent to run `env | grep MTAH`; it
 should show `/nonexistent`.
 
-Paste the brief below into each one. Look in on them every hour or two; they'll ask before pushing.
+Paste the brief below into each one. Every brief includes this rule: **if you're unsure about
+anything (a football rule, a design choice, which approach), ask Jordan before continuing**, as a
+short question with your recommended option. Routine choices with an obvious default don't need
+asking. Look in on them every hour or two; they'll ask before pushing.
 
 ---
 

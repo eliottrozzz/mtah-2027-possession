@@ -175,9 +175,23 @@ def cells_from_log(entry):
     return {int(g): v for g, v in entry["cells"].items()}
 
 
+def retired_runs():
+    """Run files listed in results/retired.txt: versions we decided against for football reasons.
+
+    They stay in the log but are never the bar a new run has to beat. One file name per line,
+    then '#' and the reason.
+    """
+    path = os.path.join(ROOT, "results", "retired.txt")
+    if not os.path.exists(path):
+        return set()
+    with open(path) as handle:
+        return {line.split("#")[0].strip() for line in handle if line.split("#")[0].strip()}
+
+
 def keep_rule(cells, seed):
     """Compare against the best earlier run on the same seed. None if there is nothing to beat."""
-    earlier = load_runs(seed)
+    retired = retired_runs()
+    earlier = [e for e in load_runs(seed) if e["_file"] not in retired]
     if not earlier:
         return None
     best = max(earlier, key=lambda e: e["headline"])
@@ -219,12 +233,14 @@ def show(entry):
 def summary():
     for seed, title in ((0, "TUNING RUNS (seed 0)"), (1, "MILESTONE RUNS (seed 1)")):
         runs = sorted(load_runs(seed), key=lambda e: -e["headline"])
+        retired = retired_runs()
         print("\n" + title)
         if not runs:
             print("  none yet")
         for e in runs:
             rule = e.get("keep_rule") or {}
-            print("  {:.3f} ({})  {:<28} {:<10} {}  {}  {}".format(
+            print("{} {:.3f} ({})  {:<28} {:<10} {}  {}  {}".format(
+                "R" if e["_file"] in retired else " ",
                 e["headline"], " / ".join("{:.2f}".format(e["per_game"][str(g)]) for g in GAMES),
                 e["model"], e["who"], e["commit"][:7] + ("*" if e["dirty"] else ""),
                 e["time"][:16], "keep" if rule.get("keep") else ("-" if not rule else "no")))
