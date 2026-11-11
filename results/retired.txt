@@ -2,3 +2,7 @@
 20261111-004934_baseline_noball_dead_seed0.json  # scored on the old noisy copies (random 0.3 m wobble); the noise now copies the real tracking's smoothing (2026-11-11)
 20261111-004940_baseline_never_dead_seed0.json  # scored on the old noisy copies (random 0.3 m wobble); the noise now copies the real tracking's smoothing (2026-11-11)
 20261111-121729_touch_v1_seed0.json  # scored on the old noisy copies (random 0.3 m wobble); the noise now copies the real tracking's smoothing (2026-11-11)
+20261111-112142_dead_ball_players_seed0.json  # scored on the old noisy copies (random 0.3 m wobble); the noise now copies the real tracking's smoothing (2026-11-11)
+20261111-120337_dead_ball_players_seed0.json  # scored on the old noisy copies (random 0.3 m wobble); the noise now copies the real tracking's smoothing (2026-11-11)
+20261111-120859_dead_ball_players_seed0.json  # scored on the old noisy copies (random 0.3 m wobble); the noise now copies the real tracking's smoothing (2026-11-11)
+20261111-121835_dead_ball_players_seed0.json  # scored on the old noisy copies (random 0.3 m wobble); the noise now copies the real tracking's smoothing (2026-11-11)
