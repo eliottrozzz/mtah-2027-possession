@@ -23,10 +23,10 @@ opponent's touch that changes nothing is not a loss. So:
   BALL OUT, FAULT RECEIVED, CHALLENGE with  D: play has stopped
   a FAULT subtype, shot GOAL/OUT, OFFSIDE,
   FORCED, HAND BALL, END HALF
-  SET PIECE after D                         D until the restart pass is received (--restart
-                                            reception) or from the kick (--restart kick)
-  RECOVERY after D (keeper rolling the ball alive from the RECOVERY, before the goal kick,
-  out, Metrica's goal-kick marker)          as the public ground truth does at 12:15
+  SET PIECE after D, or a goal kick         D until the restart pass is received (--restart
+  (PASS or BALL LOST with GOAL KICK)        reception) or from the kick (--restart kick)
+  RECOVERY after D (a player picking up     no change: still D, like handling the ball at 8:35
+  the ball, e.g. the keeper)
 
 Deflections are mostly not events in Metrica's data, so they are ignored without any rule. The
 exceptions are blocks and saves, which Metrica logs as RECOVERY: a block never switches
@@ -184,6 +184,15 @@ def label_period(events, labels, restart):
     for event in events:
         team, kind = event["team"], event["type"]
 
+        if (kind == "BALL LOST" and "GOAL KICK" in event["sub"] and state == "D"
+                and awaiting is None and team is not None and event["start"] >= stopped_at):
+            # A goal kick the opponents win is logged as BALL LOST, not PASS: it is still the
+            # restart kick, so the ball comes alive at the next touch (the interception).
+            awaiting = team
+            if restart == "kick":
+                change(event["start"], team)
+                state, awaiting = team, None
+
         if kind in POSSESSION_TYPES and team is not None:
             if state == "D" and event["start"] < stopped_at:
                 # Logged after the stoppage but started before it, like the carry that took the
@@ -214,12 +223,16 @@ def label_period(events, labels, restart):
                     # A restart pass with no SET PIECE logged, e.g. a goal kick.
                     change(end_frame(event) if restart == "reception" else event["start"], team)
                     state = team
+                elif kind == "RECOVERY":
+                    # A RECOVERY in a stoppage is a player picking up the ball, e.g. the keeper
+                    # before a goal kick, sometimes holding it for 30 s or more. Handling the
+                    # ball during a stoppage doesn't end D (8:35 in the public ground truth), so
+                    # the goal kick waits for its reception like any other restart. The keeper
+                    # rolling the ball to a teammate before the kick (12:15) never happens in
+                    # these games; the model handles it, not this answer key.
+                    pass
                 else:
-                    # A RECOVERY in a stoppage is Metrica's marker for the ball being brought
-                    # back into play other than by a SET PIECE: usually the keeper rolling it out
-                    # before a goal kick, a median 2.4 s before the kick. The public ground truth
-                    # agrees: at 12:15 it ends D when the keeper rolls the ball to a defender,
-                    # before the kick. A SHOT or CARRY means play is already running.
+                    # A SHOT or CARRY means play is already running.
                     change(event["start"], team)
                     state = team
             elif state == "D":

@@ -54,7 +54,10 @@ This is stricter than CHALLENGE.md's wording, which says a won aerial duel witho
 * **Advantage** is play on: no `D` until the referee actually stops play.
 * **Ends when the restart pass is received**, not when it is kicked. At the 8:38 free kick, the ball is still `D` in the air and `H` starts at 8:39.56, when the defender receives it. At the 11:53 short corner, `A` starts about 0.5 s after the kick, around the reception. The restarting team has possession from the reception.
 * **Handling or placing the ball during a stoppage doesn't end `D`.** At 8:35 – 8:38 a Barcelona player picks up, kicks and places the ball, and it stays `D`.
-* **Goal kicks are the exception:** at 12:15, `D` ends when the keeper rolls the ball to a defender, about 1.5 s before the defender takes the goal kick at about 12:17. So the ball is alive from the keeper bringing it back into play, not from the kick. Metrica logs that moment as a RECOVERY.
+* **Keeper rolling the ball out before a goal kick is the exception:** at 12:15, `D` ends when the keeper rolls the ball to a defender, about 1.5 s before the defender takes the goal kick at about 12:17. So in that move the ball is alive from the roll, not from the kick. Only one example, in the provided match.
+  * **A keeper holding the ball is still `D`**, like any handling during a stoppage (8:35). A goal kick the keeper takes himself waits for its reception like any other restart.
+  * **Answer key:** the roll-out never happens in the three Metrica games (in all 47 goal kicks after a keeper's RECOVERY, the keeper takes the kick himself, sometimes after holding the ball for 30 s or more), so the answer key has no rule for it and can't score it. Metrica's RECOVERY marks the keeper picking the ball up, not a roll.
+  * **Model:** the roll-out is handled by the model (end `D` when the tracking shows the keeper passing to a teammate during a goal-kick stoppage). 12:15 is the only check, and no distance or timing may be taken from it.
 * **Before it goes out:** the last team with a deliberate touch keeps possession until the ball crosses the line, even if an opponent is closer.
 * **Goals:** `D` from the goal until the kick-off. Not seen yet: no goal in the public 5 minutes.
 
@@ -99,6 +102,6 @@ Check these frame by frame (VLC, press E to step one frame):
 
 ## What this means for us
 
-* **Answer key (external games):** label by last deliberate touch, ignoring accidental deflections. The mapping from Metrica event types to these rules is still to be written.
+* **Answer key (external games):** label by last deliberate touch, ignoring accidental deflections. The mapping from Metrica event types to these rules is in `external/metrica_labels.py`.
 * **Model:** it must allow possessions of about 1 second after a tackle or header, while still ignoring flicker caused by tracking noise. Telling a deliberate touch from noise and from an accidental deflection is the core difficulty.
 * **Balls in the air:** the tracking is 2D, so a high ball (goal kick, long pass, cross) passes straight through the positions of the players it flies over. Being near the ball is not a touch. A touch or header shows up as a sudden change in the ball's speed or direction next to a player; a ball in flight keeps its direction and slows smoothly. In our match a high ball may also be placed metres off, or go missing, because the camera can't see height.
