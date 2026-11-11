@@ -45,8 +45,8 @@ code "/Users/Bucha/Side Projects/mtah-trackC"
 
 (In a plain terminal instead: `cd` into the worktree and run `env -u MTAH_DATA_DIR claude`.)
 The settings file above points `MTAH_DATA_DIR` at nothing and blocks the Drive folder, so the agent
-can't reach the match data even by accident. To check, ask the agent to run `echo $MTAH_DATA_DIR`;
-it should print `/nonexistent`.
+can't reach the match data even by accident. To check, ask the agent to run `env | grep MTAH`; it
+should show `/nonexistent`.
 
 Paste the brief below into each one. Look in on them every hour or two; they'll ask before pushing.
 
