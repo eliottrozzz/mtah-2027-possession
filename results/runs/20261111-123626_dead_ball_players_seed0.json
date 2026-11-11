@@ -1,0 +1,279 @@
+{
+ "model": "dead_ball_players",
+ "spec": "models.dead_ball:DeadBallB",
+ "settings": {
+  "base": "baseline_never_dead",
+  "windows_s": [
+   2,
+   8,
+   20
+  ],
+  "side_window_s": 6,
+  "l2": 1.0,
+  "max_gap_frames": 150,
+  "carry_radius_m": 2.0,
+  "inputs": [
+   "median_speed",
+   "fast_speed",
+   "walking",
+   "sprinting",
+   "shape_moving",
+   "gathered",
+   "at_touchline",
+   "ball_out",
+   "ball_still"
+  ],
+  "post": {
+   "threshold": 0.55,
+   "min_dead_s": 2,
+   "min_live_s": 4
+  },
+  "post_grid": {
+   "threshold": [
+    0.35,
+    0.45,
+    0.55,
+    0.65
+   ],
+   "min_dead_s": [
+    2,
+    4,
+    8,
+    12
+   ],
+   "min_live_s": [
+    2,
+    4,
+    8,
+    12
+   ]
+  }
+ },
+ "seed": 0,
+ "who": "agentB",
+ "note": "v4 re-scored on the smoothed noisy copies",
+ "time": "2026-11-11T12:36:26",
+ "branch": "jordan/dead-ball",
+ "commit": "2541963aaefc2ed493cf2746b2f8c16e2a119850",
+ "dirty": false,
+ "headline": 0.20039219016297616,
+ "per_game": {
+  "1": 0.22365927227816837,
+  "2": 0.20736941760560818,
+  "3": 0.17014788060515196
+ },
+ "cells": {
+  "1": {
+   "reception": {
+    "20": {
+     "spell_f1": 0.2256578947368421,
+     "macro_f1": 0.7825255076659827,
+     "n_gt_spells": 334,
+     "n_pred_spells": 882,
+     "spell_f1_range": [
+      0.20787828947368422,
+      0.2467598684210526
+     ]
+    },
+    "35": {
+     "spell_f1": 0.22166064981949463,
+     "macro_f1": 0.767653938438508,
+     "n_gt_spells": 334,
+     "n_pred_spells": 774,
+     "spell_f1_range": [
+      0.2032490974729242,
+      0.2426534296028881
+     ]
+    },
+    "50": {
+     "spell_f1": 0.19458375125376132,
+     "macro_f1": 0.7455590875720118,
+     "n_gt_spells": 334,
+     "n_pred_spells": 663
+    },
+    "clean": {
+     "spell_f1": 0.2398786959818044,
+     "macro_f1": 0.7918545825538225,
+     "n_gt_spells": 334,
+     "n_pred_spells": 985
+    }
+   },
+   "kick": {
+    "20": {
+     "spell_f1": 0.2321951219512195,
+     "macro_f1": 0.7868446903792226,
+     "n_gt_spells": 348,
+     "n_pred_spells": 882
+    },
+    "35": {
+     "spell_f1": 0.22281639928698752,
+     "macro_f1": 0.772952968652656,
+     "n_gt_spells": 348,
+     "n_pred_spells": 774
+    },
+    "50": {
+     "spell_f1": 0.19980217606330367,
+     "macro_f1": 0.7494343334044905,
+     "n_gt_spells": 348,
+     "n_pred_spells": 663
+    },
+    "clean": {
+     "spell_f1": 0.24276069017254312,
+     "macro_f1": 0.7978889110575613,
+     "n_gt_spells": 348,
+     "n_pred_spells": 985
+    }
+   }
+  },
+  "2": {
+   "reception": {
+    "20": {
+     "spell_f1": 0.21264559068219632,
+     "macro_f1": 0.7787640488129032,
+     "n_gt_spells": 297,
+     "n_pred_spells": 905,
+     "spell_f1_range": [
+      0.1913477537437604,
+      0.2326955074875208
+     ]
+    },
+    "35": {
+     "spell_f1": 0.20209324452902,
+     "macro_f1": 0.7794612287410042,
+     "n_gt_spells": 297,
+     "n_pred_spells": 754,
+     "spell_f1_range": [
+      0.18076117982873455,
+      0.2226641294005709
+     ]
+    },
+    "50": {
+     "spell_f1": 0.1908994708994709,
+     "macro_f1": 0.7418168367537818,
+     "n_gt_spells": 297,
+     "n_pred_spells": 648
+    },
+    "clean": {
+     "spell_f1": 0.21894060995184592,
+     "macro_f1": 0.7883014720965199,
+     "n_gt_spells": 297,
+     "n_pred_spells": 949
+    }
+   },
+   "kick": {
+    "20": {
+     "spell_f1": 0.21232539030402625,
+     "macro_f1": 0.7843916020586928,
+     "n_gt_spells": 312,
+     "n_pred_spells": 905
+    },
+    "35": {
+     "spell_f1": 0.2045028142589118,
+     "macro_f1": 0.7864668100482645,
+     "n_gt_spells": 312,
+     "n_pred_spells": 754
+    },
+    "50": {
+     "spell_f1": 0.19166666666666668,
+     "macro_f1": 0.7507651770082914,
+     "n_gt_spells": 312,
+     "n_pred_spells": 648
+    },
+    "clean": {
+     "spell_f1": 0.2217287866772403,
+     "macro_f1": 0.7977063262231501,
+     "n_gt_spells": 312,
+     "n_pred_spells": 949
+    }
+   }
+  },
+  "3": {
+   "reception": {
+    "20": {
+     "spell_f1": 0.16818181818181815,
+     "macro_f1": 0.7765100106236047,
+     "n_gt_spells": 366,
+     "n_pred_spells": 1130,
+     "spell_f1_range": [
+      0.15427807486631015,
+      0.18074866310160428
+     ]
+    },
+    "35": {
+     "spell_f1": 0.17211394302848576,
+     "macro_f1": 0.7635649687741682,
+     "n_gt_spells": 366,
+     "n_pred_spells": 968,
+     "spell_f1_range": [
+      0.15499250374812593,
+      0.18980509745127436
+     ]
+    },
+    "50": {
+     "spell_f1": 0.17218309859154932,
+     "macro_f1": 0.747890867215229,
+     "n_gt_spells": 366,
+     "n_pred_spells": 770
+    },
+    "clean": {
+     "spell_f1": 0.17676143386897405,
+     "macro_f1": 0.7706250877285088,
+     "n_gt_spells": 366,
+     "n_pred_spells": 1252
+    }
+   },
+   "kick": {
+    "20": {
+     "spell_f1": 0.16821192052980133,
+     "macro_f1": 0.7801673649561297,
+     "n_gt_spells": 380,
+     "n_pred_spells": 1130
+    },
+    "35": {
+     "spell_f1": 0.17329376854599404,
+     "macro_f1": 0.7670781112056355,
+     "n_gt_spells": 380,
+     "n_pred_spells": 968
+    },
+    "50": {
+     "spell_f1": 0.17356521739130434,
+     "macro_f1": 0.7522881772658163,
+     "n_gt_spells": 380,
+     "n_pred_spells": 770
+    },
+    "clean": {
+     "spell_f1": 0.17671568627450981,
+     "macro_f1": 0.7786047421310083,
+     "n_gt_spells": 380,
+     "n_pred_spells": 1252
+    }
+   }
+  }
+ },
+ "keep_rule": {
+  "against": "20261111-122948_touch_v1_seed0.json",
+  "against_model": "touch_v1",
+  "headline_gain": -0.158,
+  "drops_over_limit": {
+   "game1 reception live20": 0.1493,
+   "game1 reception live35": 0.1324,
+   "game1 reception live50": 0.0833,
+   "game1 kick live20": 0.1408,
+   "game1 kick live35": 0.1256,
+   "game1 kick live50": 0.0755,
+   "game2 reception live20": 0.1414,
+   "game2 reception live35": 0.1224,
+   "game2 reception live50": 0.048,
+   "game2 kick live20": 0.1376,
+   "game2 kick live35": 0.1135,
+   "game2 kick live50": 0.0409,
+   "game3 reception live20": 0.2189,
+   "game3 reception live35": 0.1839,
+   "game3 reception live50": 0.1156,
+   "game3 kick live20": 0.2141,
+   "game3 kick live35": 0.1795,
+   "game3 kick live50": 0.1051
+  },
+  "keep": false
+ }
+}
