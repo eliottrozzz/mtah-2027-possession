@@ -31,8 +31,10 @@ Dead ball, from:
   End of half: the final whistle, lag-corrected; the start of each half is dead until kick-off.
 Until:
   --restart reception: the restart pass is received: the first frame another player is within
-  RECEIVE_M of the ball, at most until the next logged touch. Goal kicks (the keeper's restart),
-  and restarts taken as a shot (penalties, direct free kicks), are alive at the kick.
+  RECEIVE_M of the ball, at most until the next logged touch. Goal kicks wait for their
+  reception like any other restart (answer-key-v1: the keeper rolling the ball out first is the
+  model's job, not the key's). Restarts taken as a shot (penalties, direct free kicks) are alive
+  at the kick.
   --restart kick: the kick.
 
 Known limits (see external/README.md): touches DFL doesn't log can't switch possession (the switch
@@ -185,7 +187,7 @@ def label_match(match, restart, out_gap=None):
         return None
 
     def alive_of(event, kick_row):
-        if restart == "kick" or event["tag"] == "GoalKick" or "ShotAtGoal" in event["tags"]:
+        if restart == "kick" or "ShotAtGoal" in event["tags"]:
             return kick_row
         kicker = column.get(ds.touch_player(event))
         later = touch_rows[touch_rows > kick_row]
