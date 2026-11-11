@@ -12,8 +12,10 @@ How it works:
      after a restart). Player speeds are divided by that half's typical speed, so a slower game
      or noisier tracking doesn't shift everything.
   2. A logistic regression turns them into P(dead), fitted on the training games.
-  3. P(dead) is smoothed, thresholded, and short dead or live runs are removed. The threshold and
-     minimum lengths are picked in fit() by spellF1 on the training games, never on test scores.
+  3. P(dead) is thresholded, short dead or live runs are removed, and each dead run's edges are
+     moved (players start moving before the restart pass is received, so runs tend to end early).
+     The threshold, minimum lengths and edge shifts are picked in fit() by spellF1 on the training
+     games, never on test scores.
   4. Baseline B (nearest team, switch after 0.5 s, never dead) gives the team; dead frames get D.
   Before all this, short ball gaps are filled where one player clearly carries the ball through
   them (fill_ball_gaps). The longest gap to fill is learned in fit(); longer gaps stay missing.
@@ -53,6 +55,10 @@ GAP_SAMPLES = 2000            # hidden stretches per candidate length when learn
 THRESHOLDS = (0.35, 0.45, 0.55, 0.65)
 MIN_DEAD_S = (2, 4, 8, 12)
 MIN_LIVE_S = (2, 4, 8, 12)
+# Moving each dead run's edges, picked in fit() after the above: the players start moving before
+# the restart pass is received, so detected dead runs tend to end early
+START_SHIFTS_S = (0, 0.5, 1.0)      # start each dead run this much earlier
+END_SHIFTS_S = (0, 0.5, 1.0, 1.5)   # end each dead run this much later
 
 
 # -- features -----------------------------------------------------------------------------------
@@ -279,8 +285,17 @@ def clean_runs(dead, min_dead, min_live):
     return dead
 
 
-def to_dead(prob, threshold, min_dead_s, min_live_s):
-    return clean_runs(prob > threshold, int(min_dead_s * FPS), int(min_live_s * FPS))
+def to_dead(prob, threshold, min_dead_s, min_live_s, start_shift_s=0, end_shift_s=0):
+    dead = clean_runs(prob > threshold, int(min_dead_s * FPS), int(min_live_s * FPS))
+    return widen_runs(dead, int(start_shift_s * FPS), int(end_shift_s * FPS))
+
+
+def widen_runs(dead, before, after):
+    """Start each dead run `before` frames earlier and end it `after` frames later."""
+    out = dead.copy()
+    for start, end in list(runs(dead)):
+        out[max(0, start - before):min(len(dead), end + after)] = True
+    return out
 
 
 # -- the detector, usable from any model ------------------------------------------------------
@@ -292,8 +307,8 @@ class DeadBallDetector:
         detector.fit(train)                 # train: list of (tracking, labels), as in fit()
         dead = detector.dead_mask(tracking)  # bool per frame; True = dead ball
 
-    fit() learns the regression, the threshold and minimum run lengths, and the longest ball gap
-    to fill. The threshold and run lengths are picked by spellF1 of base_predict's labels with
+    fit() learns the regression, the threshold, minimum run lengths and edge shifts, and the
+    longest ball gap to fill. The threshold, run lengths and shifts are picked by spellF1 of base_predict's labels with
     the dead frames set to D, so pass your own model's predict to tune them for it (default:
     baseline B). Short ball gaps are filled inside the detector only; the caller's tracking is
     never changed.
@@ -309,7 +324,8 @@ class DeadBallDetector:
                 "max_gap_frames": self.max_gap, "carry_radius_m": CARRY_RADIUS_M,
                 "inputs": list(frame_features_names()), "post": self.post,
                 "post_grid": {"threshold": THRESHOLDS, "min_dead_s": MIN_DEAD_S,
-                              "min_live_s": MIN_LIVE_S}}
+                              "min_live_s": MIN_LIVE_S, "start_shift_s": START_SHIFTS_S,
+                              "end_shift_s": END_SHIFTS_S}}
 
     def dead_probability(self, tracking):
         X = features(fill_ball_gaps(tracking, self.max_gap))
@@ -339,15 +355,26 @@ class DeadBallDetector:
         # 2. Threshold and minimum run lengths: best mean spellF1 on the training games
         probs = [self.dead_probability(tracking) for tracking, _ in train]
         bases = [base_predict(tracking) for tracking, _ in train]
-        best = -1.0
-        for threshold, min_dead, min_live in itertools.product(THRESHOLDS, MIN_DEAD_S, MIN_LIVE_S):
-            post = {"threshold": threshold, "min_dead_s": min_dead, "min_live_s": min_live}
-            score = np.mean([
+        def score(post):
+            return np.mean([
                 pm.evaluate(labels, pm.label_codes(with_dead(base, to_dead(prob, **post), tracking)))
                 ["spell_f1_mean"]
                 for (tracking, labels), base, prob in zip(train, bases, probs)])
-            if score > best:
-                best, self.post = score, post
+
+        best = -1.0
+        for threshold, min_dead, min_live in itertools.product(THRESHOLDS, MIN_DEAD_S, MIN_LIVE_S):
+            post = {"threshold": threshold, "min_dead_s": min_dead, "min_live_s": min_live}
+            post_score = score(post)
+            if post_score > best:
+                best, self.post = post_score, post
+
+        # 3. Then how far to move the edges of each dead run (no move is one of the options)
+        chosen = dict(self.post)
+        for start_shift, end_shift in itertools.product(START_SHIFTS_S, END_SHIFTS_S):
+            post = dict(chosen, start_shift_s=start_shift, end_shift_s=end_shift)
+            post_score = score(post)
+            if post_score > best:
+                best, self.post = post_score, post
 
 
 def with_dead(labels, dead, tracking):
