@@ -12,8 +12,8 @@ How it works:
      after a restart). Player speeds are divided by that half's typical speed, so a slower game
      or noisier tracking doesn't shift everything.
   2. A logistic regression turns them into P(dead), fitted on the training games.
-  3. P(dead) is smoothed, thresholded, and short dead or live runs are removed. The threshold and
-     minimum lengths are picked in fit() by spellF1 on the training games, never on test scores.
+  3. P(dead) is thresholded with hysteresis (a high threshold to start a dead run, a lower one to
+     keep it going), and short dead or live runs are removed. The thresholds and minimum lengths are picked in fit() by spellF1 on the training games, never on test scores.
   4. Baseline B (nearest team, switch after 0.5 s, never dead) gives the team; dead frames get D.
 
     python evaluation/score_external.py --model models.dead_ball:DeadBallB --who agentB
@@ -45,9 +45,12 @@ SIDE_WINDOW_S = 6             # windows just before and just after the frame
 FIT_STEP = 5                  # use every 5th frame to fit the regression (neighbours are alike)
 L2 = 1.0                      # ridge penalty on the regression weights
 # Post-processing candidates, chosen in fit() by spellF1 on the training games
-THRESHOLDS = (0.35, 0.45, 0.55, 0.65)
-MIN_DEAD_S = (2, 4, 8, 12)
-MIN_LIVE_S = (2, 4, 8, 12)
+POST_GRID = {
+    "enter": (0.5, 0.6, 0.7, 0.8),    # P(dead) must pass this for a dead run to start...
+    "exit": (0.3, 0.4, 0.5),          # ...and the run lasts while P(dead) stays above this
+    "min_dead_s": (1, 2, 4, 8),
+    "min_live_s": (2, 4, 8),
+}
 
 
 # -- features -----------------------------------------------------------------------------------
@@ -214,8 +217,13 @@ def clean_runs(dead, min_dead, min_live):
     return dead
 
 
-def to_dead(prob, threshold, min_dead_s, min_live_s):
-    return clean_runs(prob > threshold, int(min_dead_s * FPS), int(min_live_s * FPS))
+def to_dead(prob, enter, exit, min_dead_s, min_live_s):
+    """Dead runs: stretches where P(dead) > exit that somewhere reach P(dead) > enter."""
+    dead = np.zeros(len(prob), dtype=bool)
+    for start, end in runs(prob > exit):
+        if prob[start:end].max() > enter:
+            dead[start:end] = True
+    return clean_runs(dead, int(min_dead_s * FPS), int(min_live_s * FPS))
 
 
 # -- the model ----------------------------------------------------------------------------------
@@ -226,13 +234,12 @@ class DeadBallB:
     def __init__(self):
         self.base = NeverDead()
         self.mean = self.std = self.weights = self.bias = None
-        self.post = {"threshold": 0.5, "min_dead_s": 3, "min_live_s": 3}
+        self.post = {"enter": 0.6, "exit": 0.4, "min_dead_s": 2, "min_live_s": 4}
 
     def settings(self):
         return {"base": self.base.name, "windows_s": WINDOWS_S, "side_window_s": SIDE_WINDOW_S,
                 "l2": L2, "inputs": list(frame_features_names()), "post": self.post,
-                "post_grid": {"threshold": THRESHOLDS, "min_dead_s": MIN_DEAD_S,
-                              "min_live_s": MIN_LIVE_S}}
+                "post_grid": POST_GRID}
 
     def dead_probability(self, X):
         Z = (X - self.mean) / self.std
@@ -251,24 +258,25 @@ class DeadBallB:
         Z = np.where(np.isfinite(X), (X - self.mean) / self.std, 0.0)
         self.weights, self.bias = fit_logistic(Z, y.astype(np.float64))
 
-        # 2. Threshold and minimum run lengths: best mean spellF1 on the training games
+        # 2. Thresholds and minimum run lengths: best mean spellF1 on the training games
         probs = [self.dead_probability(f) for f in feats]
         bases = [self.base.predict(tracking) for tracking, _ in train]
         best = -1.0
-        for threshold, min_dead, min_live in itertools.product(THRESHOLDS, MIN_DEAD_S, MIN_LIVE_S):
+        for values in itertools.product(*POST_GRID.values()):
+            post = dict(zip(POST_GRID, values))
+            if post["exit"] > post["enter"]:
+                continue
             score = np.mean([
-                pm.evaluate(labels, pm.label_codes(self.combine(base, prob, tracking,
-                                                                threshold, min_dead, min_live)))
+                pm.evaluate(labels, pm.label_codes(self.combine(base, prob, tracking, **post)))
                 ["spell_f1_mean"]
                 for (tracking, labels), base, prob in zip(train, bases, probs)])
             if score > best:
-                best = score
-                self.post = {"threshold": threshold, "min_dead_s": min_dead, "min_live_s": min_live}
+                best, self.post = score, post
 
     @staticmethod
-    def combine(base, prob, tracking, threshold, min_dead_s, min_live_s):
+    def combine(base, prob, tracking, **post):
         labels = base.copy()
-        labels[to_dead(prob, threshold, min_dead_s, min_live_s)] = "D"
+        labels[to_dead(prob, **post)] = "D"
         labels[tracking["period"] == 0] = "D"
         return labels
 
