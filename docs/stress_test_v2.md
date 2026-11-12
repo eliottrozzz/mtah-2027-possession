@@ -51,3 +51,27 @@ missing it drops to 0.35, still about double the nearest-player floor.
    unlikely to bite.
    - *Possible hardening (dead-ball detector):* measure speed over a longer step (for example
      0.4 s), which averages wobble out at little cost.
+
+## Hardening tried (2026-11-12)
+
+**Dead-ball detector: player movement over 0.4 s** (commit 42c04d4; measured with
+`evaluation/stress_test.py`, same variants as above):
+
+| Variant (live35) | v2 | v2 + 0.4 s speeds |
+|---|---|---|
+| As calibrated | 0.471 | 0.465 |
+| Player wobble 0.1 m (score) | 0.400 | **0.459** |
+| Player wobble 0.1 m (macroF1) | 0.70 | **0.82** |
+| Player wobble 0.1 m (change vs as calibrated) | −0.071 | −0.006 |
+| Ball blur x1.5 | 0.387 | 0.385 |
+| Other variants | — | within about 0.01 of v2's |
+
+**Seed-0 score:**
+- headline 0.472 (0.50 / 0.46 / 0.45) against the 0.479 bar (−0.007);
+- largest drop on a noisy result −0.018, on a clean result −0.028.
+
+Logged as `results/runs/20261112-131725_touch_dead_v2_seed0.json`.
+
+**Touch threshold relative to the match** (main session): no change at the normal blur or at
+1.24 s, so it was reverted. Even v2 fitted on 1.24 s copies reaches only 0.404 there, so most of
+that loss is information the blurrier tracking doesn't contain.
