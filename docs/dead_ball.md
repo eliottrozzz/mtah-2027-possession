@@ -47,8 +47,9 @@ The filled ball feeds the dead-ball signals only, never the possession model's t
   tracking and event data. *[To confirm: licence wording.]*
 - **Answer key:** built by our team from Metrica's events, following our possession rules (see
   that section). A dead run starts at the ball going out, a foul, a goal, an offside, a handball
-  or the end of a half. It ends when the restart pass is received, or, for a goal kick, when the
-  keeper brings the ball back into play. Nothing comes from the provided match.
+  or the end of a half. It ends when the restart pass is received, goal kicks included. A
+  keeper picking up the ball during a stoppage doesn't end it. Nothing comes from the provided
+  match.
 - **Noisy copies:** the training data is a noisy copy of the Metrica tracking made to look like
   the provided match.
   - The ball is hidden on 20, 35 or 50% of live frames, in long bursts on slow balls and in crowds.
@@ -70,8 +71,10 @@ The filled ball feeds the dead-ball signals only, never the possession model's t
 | — | "Ball missing" as an input | Never used, by design (see Approach) |
 
 On the final noisy copies, adding the detector to the simplest possession rule (nearest team,
-never dead) raises the possession score from **0.168 to 0.200** and per-frame macroF1 from
-**0.39 to about 0.77**, averaged over the three test games.
+never dead) raises the possession score from **0.165 to 0.196** and per-frame macroF1 from
+**0.38 to about 0.79**, averaged over the three test games. In the final model, adding the
+detector to the last-touch model (together with taking the restart team from the first touch
+after a stoppage) raises the possession score from 0.354 to 0.468.
 
 ## Limitations
 
