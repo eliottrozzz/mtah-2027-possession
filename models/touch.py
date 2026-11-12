@@ -37,11 +37,11 @@ GRID = {
     # The provided tracking is smoothed over about 0.8 s, which blurs kicks into small velocity
     # changes (under 6 m/s 99% of the time), so the ranges cover weak touches, longer measuring
     # windows and a lagging ball.
-    # Touch threshold as a share of the match's own 90th-percentile touch strength, so it adapts
-    # if the real ball is blurrier or sharper than our noise (Track B's stress test, 2026-11-12:
-    # an absolute 2.0 m/s threshold lost 0.084 when the blur went 0.84 s -> 1.24 s). Under our
-    # noise the 90th percentile is about 7.1 m/s, so these match 1, 1.5, 2, 3, 4 m/s.
-    "min_strength_rel": (0.14, 0.21, 0.28, 0.42, 0.56),
+    "min_strength": (1.0, 1.5, 2.0, 3.0, 4.0),  # m/s change in velocity
+    # A threshold relative to the match's own 90th-percentile touch strength (min_strength_rel,
+    # see strength_threshold) was tried 2026-11-12 for robustness to a blurrier ball: no change
+    # (0.478 vs 0.479; at a 1.24 s blur 0.385 vs 0.387). Even a model fitted on 1.24 s copies
+    # only reaches 0.404, so most of that loss is information the blur destroys. Not kept.
     "radius_m": (1.0, 1.5, 2.5, 3.5),
     "window": (4, 8, 12),                        # frames each side (0.16, 0.32, 0.48 s)
     # Whose touch it is (see assign_players). Tried 2026-11-11: with "at", "after" and "closest"
