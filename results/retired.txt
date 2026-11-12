@@ -6,3 +6,8 @@
 20261111-120337_dead_ball_players_seed0.json  # scored on the old noisy copies (random 0.3 m wobble); the noise now copies the real tracking's smoothing (2026-11-11)
 20261111-120859_dead_ball_players_seed0.json  # scored on the old noisy copies (random 0.3 m wobble); the noise now copies the real tracking's smoothing (2026-11-11)
 20261111-121835_dead_ball_players_seed0.json  # scored on the old noisy copies (random 0.3 m wobble); the noise now copies the real tracking's smoothing (2026-11-11)
+20261111-122848_baseline_never_dead_seed0.json  # scored on the old answer key; Eliott's goal-kick/keeper rule (9cdedd6) changed the key (2026-11-12)
+20261111-122854_baseline_noball_dead_seed0.json  # scored on the old answer key; Eliott's goal-kick/keeper rule (9cdedd6) changed the key (2026-11-12)
+20261111-122948_touch_v1_seed0.json  # scored on the old answer key; Eliott's goal-kick/keeper rule (9cdedd6) changed the key (2026-11-12)
+20261111-123626_dead_ball_players_seed0.json  # scored on the old answer key; Eliott's goal-kick/keeper rule (9cdedd6) changed the key (2026-11-12)
+20261111-125745_touch_dead_v2_seed0.json  # scored on the old answer key; Eliott's goal-kick/keeper rule (9cdedd6) changed the key (2026-11-12)
