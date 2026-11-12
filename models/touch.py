@@ -50,12 +50,18 @@ GRID = {
     # only known to about +-0.16 s). Metrica prefers 0.8 s, but its events log fewer quick touches
     # than the organisers do. Scores for 0.4-0.6 s were within 0.003. Decided 2026-11-11.
     "deflection_s": (0.5,),
+    # Close calls between players: cost = distance - leave_m * cos(angle between the ball's new
+    # direction and the player-to-ball line). Tried 2026-11-12 with (0, 0.5, 1, 2): v2 rose
+    # 0.479 -> 0.486, but clean data fell sharply (v2 game 2 clean 0.773 -> 0.615), so the gain
+    # only made up for our simulated blur, not real physics. Not kept; off.
+    "leave_m": (0.0,),
     # Ball reappearing after a gap of at least this long counts as a touch (0 = off). Added
     # 2026-11-12: on game 1, 12-21% of missed switches happened while the ball was unseen.
     "reappear_s": (0.0, 0.2, 0.5, 1.0),
 }
 DEFAULTS = {"min_strength": 2.0, "radius_m": 2.5, "window": 8, "assign": "at",
-            "deflection_s": 0.5, "reappear_s": 0.0}
+            "deflection_s": 0.5, "reappear_s": 0.0,
+            "leave_m": 0.0}
 AFTER_FRAMES = 12               # "after": how long the toucher should stay near the ball (0.48 s)
 
 
@@ -72,8 +78,14 @@ def touch_strength(ball, window=WINDOW):
     return strength
 
 
-def find_touches(tracking, min_strength, radius_m, window=WINDOW, assign="at"):
-    """(frames, teams) of touches: peaks of touch strength with a player within radius_m."""
+def find_touches(tracking, min_strength, radius_m, window=WINDOW, assign="at", leave_m=0.0):
+    """(frames, teams) of touches: peaks of touch strength with a player within radius_m.
+
+    With leave_m > 0 (and assign "at"), the toucher is the player with the lowest
+    distance - leave_m * cos(angle between the ball's direction after the touch and the line from
+    the player to the ball): the ball moves away from whoever kicked it. The radius still applies
+    to that player's real distance.
+    """
     strength = touch_strength(tracking["ball"], window)
     filled = np.nan_to_num(strength, nan=0.0)
     # A peak is the largest value within +-window frames.
@@ -83,7 +95,10 @@ def find_touches(tracking, min_strength, radius_m, window=WINDOW, assign="at"):
     if not len(peaks):
         return peaks, np.array([], dtype="<U1")
 
-    nearest, dist = assign_players(tracking, peaks, assign, window)
+    if leave_m > 0 and assign == "at":
+        nearest, dist = leaving_player(tracking, peaks, window, leave_m)
+    else:
+        nearest, dist = assign_players(tracking, peaks, assign, window)
     close = dist <= radius_m
     return peaks[close], tracking["team"][nearest[close]]
 
@@ -118,6 +133,24 @@ def assign_players(tracking, peaks, assign, window):
     return nearest, per_player[np.arange(len(peaks)), nearest]
 
 
+def leaving_player(tracking, peaks, window, leave_m):
+    """(player index, distance in m) by the 'ball moves away from the kicker' cost."""
+    n = len(tracking["ball"])
+    ball = tracking["ball"][peaks] * PITCH                                        # (t, 2)
+    later = tracking["ball"][np.clip(peaks + window, 0, n - 1)] * PITCH
+    move = later - ball
+    move = move / np.maximum(np.hypot(*move.T), 1e-6)[:, None]                    # unit direction
+    rel = ball[:, None, :] - tracking["players"][peaks] * PITCH                  # player -> ball
+    dist = np.hypot(*rel.transpose(2, 0, 1))                                      # (t, p)
+    with np.errstate(all="ignore"):
+        cos = np.einsum("tpk,tk->tp", rel, move) / np.maximum(dist, 1e-6)
+    cost = dist - leave_m * np.nan_to_num(cos, nan=0.0)
+    cost = np.where(np.isnan(dist), np.inf, cost)
+    nearest = np.argmin(cost, axis=1)
+    dist = np.where(np.isnan(dist), np.inf, dist)
+    return nearest, dist[np.arange(len(peaks)), nearest]
+
+
 def find_reappearances(tracking, min_gap_frames, radius_m):
     """(frames, teams): the first frame the ball is seen after a gap of at least min_gap_frames,
     given to the nearest player at that frame if within radius_m."""
@@ -137,7 +170,8 @@ def find_reappearances(tracking, min_gap_frames, radius_m):
 def all_touches(tracking, params):
     """Touches, plus reappearances if switched on, in time order, with deflections dropped."""
     frames, teams = find_touches(tracking, params["min_strength"], params["radius_m"],
-                                 params["window"], params.get("assign", "at"))
+                                 params["window"], params.get("assign", "at"),
+                                 params.get("leave_m", 0.0))
     re_frames, re_teams = find_reappearances(
         tracking, int(round(params.get("reappear_s", 0.0) * FPS)), params["radius_m"])
     if len(re_frames):
