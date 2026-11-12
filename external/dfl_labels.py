@@ -29,6 +29,10 @@ Dead ball, from:
   after that event (advantage), from the last one instead. Fallback: the decision time.
   Drop ball: DROP_BALL_S after the last touch (nothing marks the stoppage itself).
   End of half: the final whistle, lag-corrected; the start of each half is dead until kick-off.
+  Then every stoppage start above moves to where DFL's own BallStatus says play stopped, unless
+  the logged touches contradict it (a touch after DFL's stop; or DFL stopping later than us with
+  no touch in between). This covers what the log can't: fouls noted late, video-referee reviews,
+  a half ending before the restart, and out balls the tracking doesn't follow to the line.
 Until:
   --restart reception: the restart pass is received: the first frame another player is within
   RECEIVE_M of the ball, at most until the next logged touch. Goal kicks wait for their
@@ -73,6 +77,8 @@ DROP_BALL_S = 1.0
 RECEIVE_M = 1.0
 AT_LINE_M = 0.05           # the ball at or past a line counts as out (see J03WQQ)
 RECEIVE_MIN_FRAMES = 3      # the kicker's own follow-through is not a reception
+TOUCH_SLACK_S = 0.7         # DFL's log scatter: a stoppage starts at least this long after the
+                            # last logged touch, even where DFL's ball status says earlier
 METRICA_DEAD = (0.33, 0.43)  # dead share in the Metrica keys; flag anything outside
 
 
@@ -97,7 +103,8 @@ def label_match(match, restart, out_gap=None):
     outside = inside_m <= AT_LINE_M
     crossing = np.flatnonzero(outside[1:] & ~outside[:-1]) + 1
     column = {pid: i for i, pid in enumerate(game["player"])}
-    how = {"crossing": 0, "fallback": 0, "foul": 0, "advantage": 0, "drop": 0}
+    how = {"crossing": 0, "fallback": 0, "foul": 0, "advantage": 0, "drop": 0,
+           "dfl_status_earlier": 0, "dfl_status_later": 0}
     gaps = []  # (restart type, decision row - crossing row) where a crossing was found
 
     def lag_row(time_text):
@@ -219,6 +226,53 @@ def label_match(match, restart, out_gap=None):
             half = period[event["lag_row"]]
             last = np.flatnonzero(period == half)[-1]
             labels[max(event["lag_row"], (last_touch_before(last) or 0) + 1):last + 1] = "D"
+
+    # -- stoppage starts from DFL's own ball status -----------------------------------------
+    # DFL's per-frame BallStatus is the league's record of when play stopped; ours is rebuilt
+    # from a live log that can note a foul or an out ball many seconds late, and has no event for
+    # a half ending before the restart or a video-referee review. So each stoppage starts where
+    # DFL's matching dead stretch starts, unless the logged touches contradict it: a touch after
+    # DFL's stop means the ball was still in play (the stoppage starts TOUCH_SLACK_S after the
+    # last touch), and DFL stopping later than us counts only if a touch is logged in between.
+    # Restarts keep our own rule (DFL marks the ball alive at the kick, the public ground truth
+    # at the reception). Decided with Eliott, 2026-11-12, from 21 cases where the two disagreed
+    # for over 10 s.
+    status_dead = np.concatenate([[False], (extras["dfl_ball_status"] == 0) & (period > 0),
+                                  [False]]).astype(int)
+    dfl_dead = np.flatnonzero(np.diff(status_dead) == 1)
+    dfl_dead_end = np.flatnonzero(np.diff(status_dead) == -1)
+    half_starts = {int(np.flatnonzero(period == h)[0]) for h in (1, 2)}
+    dead = np.concatenate([[False], labels == "D", [False]]).astype(int)
+    for a, b in zip(np.flatnonzero(np.diff(dead) == 1), np.flatnonzero(np.diff(dead) == -1)):
+        if a in half_starts:
+            continue
+        # DFL's dead stretch overlapping ours the most; none means DFL has no stoppage here.
+        overlap = [(min(b, e) - max(a, s), s) for s in dfl_dead
+                   for e in dfl_dead_end[dfl_dead_end > s][:1] if min(b, e) > max(a, s)]
+        if not overlap:
+            continue
+        dfl_start = max(overlap)[1]
+        if period[dfl_start] != period[a]:
+            continue
+        if dfl_start >= a:
+            # DFL stops later than our rebuilt time. Only believe it when a touch is logged in
+            # between: after a foul or an out ball DFL sometimes stays "alive" for half a minute
+            # with nobody touching the ball (e.g. J03WN1 47:11, before a throw-in at 47:12).
+            between = touch_rows[(touch_rows >= a) & (touch_rows < dfl_start)]
+            new = dfl_start if len(between) else a
+        else:
+            last = last_touch_before(a)
+            floor = last + int(TOUCH_SLACK_S * FPS) if last is not None else dfl_start
+            new = min(a, max(dfl_start, floor))
+        new = min(new, b - 1)
+        if new == a:
+            continue
+        if new < a:
+            labels[new:a] = "D"
+            how["dfl_status_earlier"] += 1
+        else:
+            labels[a:new] = labels[a - 1]  # play went on: the team before keeps the ball
+            how["dfl_status_later"] += 1
     how["gaps"] = gaps
     return labels, how
 

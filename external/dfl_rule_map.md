@@ -18,6 +18,7 @@ Last aligned with: **`answer-key-v1`** (commit 7abc54d on `main`).
 | Goal: D from the goal to the kick-off | shot GOAL: `end_frame` | `stop_of`, KickOff after a SuccessfulShot: crossing within `GOAL_CROSS_S`; fallback shot + 1 s |
 | Foul, offside: D from the whistle; advantage is play on | FAULT RECEIVED, CHALLENGE+FAULT, OFFSIDE, HAND BALL, FORCED | `stop_of`, FreeKick/Penalty: Foul/Offside event (lag-corrected); after the last touch if touches follow (advantage) |
 | Drop ball | (no event) | `stop_of`, RefereeBall: last touch + `DROP_BALL_S` (a guess) |
+| Stoppage start, when DFL's own ball status disagrees (DFL only) | (no equivalent: Metrica has no per-frame status) | End of `label_match`: start where DFL's BallStatus says, unless a touch is logged after it (then `TOUCH_SLACK_S` after the last touch); DFL stopping later counts only with a touch logged in between |
 | End of half | END HALF | FinalWhistle loop at the end of `label_match` |
 | Start of half: D until the kick-off | `label_period` starts D | The first-touch loop (`for half in (1, 2)`) plus the KickOff restart |
 | Restart: D until the restart pass is received (`--restart reception`) or from the kick (`kick`) | SET PIECE then PASS: `end_frame` of the pass | `alive_of`: first other player within `RECEIVE_M`, from `RECEIVE_MIN_FRAMES` after the kick, capped at the next logged touch |
@@ -47,3 +48,13 @@ Last aligned with: **`answer-key-v1`** (commit 7abc54d on `main`).
 
 The sync (`dfl_sync.py`, frozen at b79114c) doesn't depend on the rules and never needs
 rebuilding.
+
+## Where our key and DFL's own flags still differ (2026-11-12, all 7 matches)
+
+* **Restarts:** DFL's flags mark the ball alive at the kick; we wait for the reception, a median
+  1.2 s later, as the public ground truth does (8:38 free kick, 11:53 corner). So DFL's flags are
+  not the system behind the ground truth, and stay a cross-check, not a key.
+* **Stoppage starts:** taken from DFL's flags since 2026-11-12, except where logged touches
+  contradict them (6 stretches over 10 s remain, each with a touch logged inside DFL's stop).
+* **Possession switches:** two thirds match DFL's to the frame. DFL switches 2–10 s before us
+  338 times, most likely at touches the event log doesn't record (still open).
