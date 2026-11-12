@@ -9,10 +9,12 @@ not enough (a high ball passes "through" players in 2D tracking), so a touch nee
        radius_m; it belongs to that player's team.
     3. Possession is the team of the last touch, except a deflection: a touch by the other team
        followed by the original team touching again within deflection_s doesn't count.
-    4. Before the first touch, and through gaps, possession carries forward. v1 never predicts D;
+    4. Optionally, the ball reappearing after a tracking gap of at least reappear_s counts as a
+       touch by the nearest player within radius_m: the team often changed while it was unseen.
+    5. Before the first touch, and through gaps, possession carries forward. v1 never predicts D;
        dead balls come from the dead-ball detector (Track B), merged in separately.
 
-min_strength, radius_m and window are chosen in fit() by trying a small grid on the
+min_strength, radius_m, window and reappear_s are chosen in fit() by trying a small grid on the
 training games (external data only) and keeping the best spellF1.
 """
 
@@ -48,9 +50,12 @@ GRID = {
     # only known to about +-0.16 s). Metrica prefers 0.8 s, but its events log fewer quick touches
     # than the organisers do. Scores for 0.4-0.6 s were within 0.003. Decided 2026-11-11.
     "deflection_s": (0.5,),
+    # Ball reappearing after a gap of at least this long counts as a touch (0 = off). Added
+    # 2026-11-12: on game 1, 12-21% of missed switches happened while the ball was unseen.
+    "reappear_s": (0.0, 0.2, 0.5, 1.0),
 }
 DEFAULTS = {"min_strength": 2.0, "radius_m": 2.5, "window": 8, "assign": "at",
-            "deflection_s": 0.5}
+            "deflection_s": 0.5, "reappear_s": 0.0}
 AFTER_FRAMES = 12               # "after": how long the toucher should stay near the ball (0.48 s)
 
 
@@ -113,6 +118,36 @@ def assign_players(tracking, peaks, assign, window):
     return nearest, per_player[np.arange(len(peaks)), nearest]
 
 
+def find_reappearances(tracking, min_gap_frames, radius_m):
+    """(frames, teams): the first frame the ball is seen after a gap of at least min_gap_frames,
+    given to the nearest player at that frame if within radius_m."""
+    if min_gap_frames <= 0:
+        return np.array([], dtype=int), np.array([], dtype="<U1")
+    missing = np.isnan(tracking["ball"][:, 0])
+    edges = np.diff(np.concatenate(([0], missing.astype(np.int8), [0])))
+    starts, stops = np.flatnonzero(edges == 1), np.flatnonzero(edges == -1)
+    frames = stops[(stops - starts >= min_gap_frames) & (starts > 0) & (stops < len(missing))]
+    if not len(frames):
+        return frames, np.array([], dtype="<U1")
+    nearest, dist = assign_players(tracking, frames, "at", 0)
+    close = dist <= radius_m
+    return frames[close], tracking["team"][nearest[close]]
+
+
+def all_touches(tracking, params):
+    """Touches, plus reappearances if switched on, in time order, with deflections dropped."""
+    frames, teams = find_touches(tracking, params["min_strength"], params["radius_m"],
+                                 params["window"], params.get("assign", "at"))
+    re_frames, re_teams = find_reappearances(
+        tracking, int(round(params.get("reappear_s", 0.0) * FPS)), params["radius_m"])
+    if len(re_frames):
+        frames = np.concatenate((frames, re_frames))
+        teams = np.concatenate((teams, re_teams))
+        order = np.argsort(frames, kind="stable")
+        frames, teams = frames[order], teams[order]
+    return drop_deflections(frames, teams, int(params["deflection_s"] * FPS))
+
+
 def drop_deflections(frames, teams, deflection_frames):
     """Remove touches by the other team that the original team gets back within the window."""
     if deflection_frames <= 0 or len(frames) < 3:
@@ -157,9 +192,7 @@ class LastTouch:
         return dict(self.params)
 
     def predict_with(self, tracking, params):
-        frames, teams = find_touches(tracking, params["min_strength"], params["radius_m"],
-                                     params["window"], params.get("assign", "at"))
-        frames, teams = drop_deflections(frames, teams, int(params["deflection_s"] * FPS))
+        frames, teams = all_touches(tracking, params)
         labels = possession_from_touches(len(tracking["ball"]), frames, teams)
         labels[tracking["period"] == 0] = "D"
         return labels

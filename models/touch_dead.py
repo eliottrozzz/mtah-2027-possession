@@ -15,7 +15,7 @@ Everything is fitted on the training games only (external data).
 import numpy as np
 
 from models.dead_ball import DeadBallDetector
-from models.touch import FPS, LastTouch, drop_deflections, find_touches
+from models.touch import LastTouch, all_touches
 
 
 def runs(mask):
@@ -36,10 +36,7 @@ class TouchDead:
                 "restart_from_next_touch": self.restart_from_next_touch}
 
     def touches(self, tracking):
-        p = self.touch.params
-        frames, teams = find_touches(tracking, p["min_strength"], p["radius_m"], p["window"],
-                                     p.get("assign", "at"))
-        return drop_deflections(frames, teams, int(p["deflection_s"] * FPS))
+        return all_touches(tracking, self.touch.params)
 
     def fit(self, train):
         self.touch.fit(train)
