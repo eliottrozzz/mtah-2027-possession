@@ -37,7 +37,11 @@ GRID = {
     # The provided tracking is smoothed over about 0.8 s, which blurs kicks into small velocity
     # changes (under 6 m/s 99% of the time), so the ranges cover weak touches, longer measuring
     # windows and a lagging ball.
-    "min_strength": (1.0, 1.5, 2.0, 3.0, 4.0),  # m/s change in velocity
+    # Touch threshold as a share of the match's own 90th-percentile touch strength, so it adapts
+    # if the real ball is blurrier or sharper than our noise (Track B's stress test, 2026-11-12:
+    # an absolute 2.0 m/s threshold lost 0.084 when the blur went 0.84 s -> 1.24 s). Under our
+    # noise the 90th percentile is about 7.1 m/s, so these match 1, 1.5, 2, 3, 4 m/s.
+    "min_strength_rel": (0.14, 0.21, 0.28, 0.42, 0.56),
     "radius_m": (1.0, 1.5, 2.5, 3.5),
     "window": (4, 8, 12),                        # frames each side (0.16, 0.32, 0.48 s)
     # Whose touch it is (see assign_players). Tried 2026-11-11: with "at", "after" and "closest"
@@ -59,7 +63,8 @@ GRID = {
     # 2026-11-12: on game 1, 12-21% of missed switches happened while the ball was unseen.
     "reappear_s": (0.0, 0.2, 0.5, 1.0),
 }
-DEFAULTS = {"min_strength": 2.0, "radius_m": 2.5, "window": 8, "assign": "at",
+STRENGTH_QUANTILE = 0.9
+DEFAULTS = {"min_strength": 2.0, "min_strength_rel": None, "radius_m": 2.5, "window": 8, "assign": "at",
             "deflection_s": 0.5, "reappear_s": 0.0,
             "leave_m": 0.0}
 AFTER_FRAMES = 12               # "after": how long the toucher should stay near the ball (0.48 s)
@@ -167,9 +172,20 @@ def find_reappearances(tracking, min_gap_frames, radius_m):
     return frames[close], tracking["team"][nearest[close]]
 
 
+def strength_threshold(tracking, params):
+    """min_strength in m/s: absolute, or min_strength_rel times this match's 90th percentile."""
+    rel = params.get("min_strength_rel")
+    if rel is None:
+        return params["min_strength"]
+    strength = touch_strength(tracking["ball"], params["window"])
+    strength = strength[(tracking["period"] > 0) & np.isfinite(strength)]
+    return rel * float(np.quantile(strength, STRENGTH_QUANTILE)) if len(strength) else np.inf
+
+
 def all_touches(tracking, params):
     """Touches, plus reappearances if switched on, in time order, with deflections dropped."""
-    frames, teams = find_touches(tracking, params["min_strength"], params["radius_m"],
+    frames, teams = find_touches(tracking, strength_threshold(tracking, params),
+                                 params["radius_m"],
                                  params["window"], params.get("assign", "at"),
                                  params.get("leave_m", 0.0))
     re_frames, re_teams = find_reappearances(
