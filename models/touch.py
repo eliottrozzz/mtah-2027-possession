@@ -51,10 +51,10 @@ GRID = {
     # than the organisers do. Scores for 0.4-0.6 s were within 0.003. Decided 2026-11-11.
     "deflection_s": (0.5,),
     # Close calls between players: cost = distance - leave_m * cos(angle between the ball's new
-    # direction and the player-to-ball line), so a player the ball moves away from is favoured.
-    # 0 = nearest player only. Added 2026-11-12: 13-18% of missed switches had a touch given to
-    # the wrong team, mostly with the right team's player within 3 m.
-    "leave_m": (0.0, 0.5, 1.0, 2.0),
+    # direction and the player-to-ball line). Tried 2026-11-12 with (0, 0.5, 1, 2): v2 rose
+    # 0.479 -> 0.486, but clean data fell sharply (v2 game 2 clean 0.773 -> 0.615), so the gain
+    # only made up for our simulated blur, not real physics. Not kept; off.
+    "leave_m": (0.0,),
     # Ball reappearing after a gap of at least this long counts as a touch (0 = off). Added
     # 2026-11-12: on game 1, 12-21% of missed switches happened while the ball was unseen.
     "reappear_s": (0.0, 0.2, 0.5, 1.0),
