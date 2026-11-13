@@ -75,3 +75,15 @@ Logged as `results/runs/20261112-131725_touch_dead_v2_seed0.json`.
 **Touch threshold relative to the match** (main session): no change at the normal blur or at
 1.24 s, so it was reverted. Even v2 fitted on 1.24 s copies reaches only 0.404 there, so most of
 that loss is information the blurrier tracking doesn't contain.
+
+**Same fix with a 0.2 s step** (2026-11-13, for comparison):
+
+| Variant (live35) | v2 | 0.4 s | 0.2 s |
+|---|---|---|---|
+| As calibrated | 0.471 | 0.465 | 0.461 |
+| Player wobble 0.1 m (change vs as calibrated) | 0.400 (−0.071) | 0.459 (−0.006) | 0.441 (−0.021) |
+| Ball blur x1.5 | 0.387 | 0.385 | 0.381 |
+| Seed-0 headline (vs 0.479 bar) | 0.479 | 0.472 (−0.007) | 0.470 (−0.009) |
+| Largest noisy / clean drop | — | −0.018 / −0.028 | −0.022 / −0.006 |
+
+Logged as `results/runs/20261113-101504_touch_dead_v2_seed0.json`.
