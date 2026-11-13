@@ -29,3 +29,4 @@
 20261113-121250_touch_dead_v3_seed0.json  # copies without a still ball before restarts; copies now place it still (fitted to the real still-ball summary, 2026-11-13)
 20261113-125025_touch_dead_v3_seed0.json  # copies without a still ball before restarts; copies now place it still (fitted to the real still-ball summary, 2026-11-13)
 20261113-124553_touch_dead_v3_seed1.json  # copies without a still ball before restarts; copies now place it still (fitted to the real still-ball summary, 2026-11-13)
+20261113-195041_touch_dead_v3_shape_seed0.json  # team-shape override everywhere: failed the 0.05 clean guard (drops 0.056-0.077), not kept (2026-11-13)
