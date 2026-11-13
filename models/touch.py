@@ -11,7 +11,9 @@ not enough (a high ball passes "through" players in 2D tracking), so a touch nee
        followed by the original team touching again within deflection_s doesn't count.
     4. Optionally, the ball reappearing after a tracking gap of at least reappear_s counts as a
        touch by the nearest player within radius_m: the team often changed while it was unseen.
-    5. Before the first touch, and through gaps, possession carries forward. v1 never predicts D;
+    5. Optionally (gap_rule), when the ball reappears after a gap of at least gap_min_s near the
+       other team, the switch is moved back inside the gap (see gap_switches).
+    6. Before the first touch, and through gaps, possession carries forward. v1 never predicts D;
        dead balls come from the dead-ball detector (Track B), merged in separately.
 
 min_strength, radius_m, window and reappear_s are chosen in fit() by trying a small grid on the
@@ -63,10 +65,20 @@ GRID = {
     # 2026-11-12: on game 1, 12-21% of missed switches happened while the ball was unseen.
     "reappear_s": (0.0, 0.2, 0.5, 1.0),
 }
+# Long ball gaps (step 5), fitted after GRID with the rest fixed. On the external games, of 129
+# gaps of 3 s or more where the team switches, the switch was within 1 s of the reappearance
+# 13% of the time, the gap's middle 22%, the "line" rule 12-15% and the "advance" rule with a
+# 1 s shift 38% (checked 2026-11-13 before building).
+GAP_CANDIDATES = [{"gap_rule": "off"}] + [
+    {"gap_rule": "line", "gap_min_s": g, "gap_line_m": 3.0} for g in (2.0, 3.0, 5.0)] + [
+    {"gap_rule": "advance", "gap_min_s": g, "gap_shift_s": k}
+    for g in (2.0, 3.0, 5.0) for k in (0.0, 1.0, 2.0)]
+ADVANCE_STEP_S = 1.0            # team centre velocity measured over this long
+ADVANCE_SMOOTH_S = 2.0          # then averaged over this long
 STRENGTH_QUANTILE = 0.9
 DEFAULTS = {"min_strength": 2.0, "min_strength_rel": None, "radius_m": 2.5, "window": 8, "assign": "at",
             "deflection_s": 0.5, "reappear_s": 0.0,
-            "leave_m": 0.0}
+            "leave_m": 0.0, "gap_rule": "off"}
 AFTER_FRAMES = 12               # "after": how long the toucher should stay near the ball (0.48 s)
 
 
@@ -172,6 +184,85 @@ def find_reappearances(tracking, min_gap_frames, radius_m):
     return frames[close], tracking["team"][nearest[close]]
 
 
+def ball_gaps(tracking, min_frames):
+    """(starts, stops) of ball gaps inside the data at least min_frames long; stop = reappearance."""
+    missing = np.isnan(tracking["ball"][:, 0])
+    edges = np.diff(np.concatenate(([0], missing.astype(np.int8), [0])))
+    starts, stops = np.flatnonzero(edges == 1), np.flatnonzero(edges == -1)
+    keep = (stops - starts >= min_frames) & (starts > 0) & (stops < len(missing))
+    return starts[keep], stops[keep]
+
+
+def team_advance(tracking):
+    """team -> per-frame speed (m/s) of the team's centre toward the other goal, smoothed. The
+    team with the ball pushes forward; attacking direction per half from the team's mean x."""
+    pos = tracking["players"][..., 0] * PITCH[0]
+    period, out = tracking["period"], {}
+    step, smooth = int(ADVANCE_STEP_S * FPS) // 2, int(ADVANCE_SMOOTH_S * FPS) // 2
+    for team in np.unique(tracking["team"]):
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore", RuntimeWarning)
+            centre = np.nanmean(pos[:, tracking["team"] == team], axis=1)
+        speed = np.full(len(centre), np.nan)
+        speed[step:-step] = (centre[2 * step:] - centre[:-2 * step]) * FPS / (2 * step)
+        sign = np.zeros(len(centre))
+        for half in (1, 2):
+            rows = period == half
+            if np.isfinite(centre[rows]).any():
+                sign[rows] = 1.0 if np.nanmean(centre[rows]) < PITCH[0] / 2 else -1.0
+        speed = np.nan_to_num(speed * sign)
+        kernel = np.ones(2 * smooth + 1) / (2 * smooth + 1)
+        out[team] = np.convolve(speed, kernel, "same")
+    return out
+
+
+def gap_switches(tracking, params, frames, teams):
+    """(frames, teams) of extra touches: a switch placed inside each long gap after which the
+    ball reappears near the other team (nearest player within radius_m).
+
+        line     first gap frame where a player of the new team is within gap_line_m of the
+                 straight line from the last-seen ball to the reappearance, at the matching point
+        advance  start of the last stretch of the gap in which the new team's centre moves toward
+                 the other goal faster than the old team's, moved gap_shift_s earlier (the
+                 smoothing lags); never before the gap starts
+
+    With no qualifying frame the switch stays at the reappearance."""
+    starts, stops = ball_gaps(tracking, int(round(params["gap_min_s"] * FPS)))
+    if not len(starts):
+        return np.array([], dtype=int), np.array([], dtype="<U1")
+    nearest, dist = assign_players(tracking, stops, "at", 0)
+    new_teams = tracking["team"][nearest]
+    advance = team_advance(tracking) if params["gap_rule"] == "advance" else None
+    out_frames, out_teams = [], []
+    for start, stop, new, d in zip(starts, stops, new_teams, dist):
+        before = np.flatnonzero(frames < start)
+        if d > params["radius_m"] or not len(before) or teams[before[-1]] == new:
+            continue
+        old = teams[before[-1]]
+        switch = stop
+        if params["gap_rule"] == "line":
+            gap = np.arange(start, stop)
+            last, seen = tracking["ball"][start - 1] * PITCH, tracking["ball"][stop] * PITCH
+            frac = (gap - start + 1) / (stop - start + 1)
+            line = last + frac[:, None] * (seen - last)
+            mine = tracking["players"][gap][:, tracking["team"] == new] * PITCH
+            with warnings.catch_warnings():
+                warnings.simplefilter("ignore", RuntimeWarning)
+                close = np.nanmin(np.hypot(*(mine - line[:, None]).transpose(2, 0, 1)), axis=1)
+            hits = np.flatnonzero(close <= params["gap_line_m"])
+            if len(hits):
+                switch = start + hits[0]
+        else:
+            ahead = advance[new][start:stop] > advance[old][start:stop]
+            if ahead[-1]:
+                behind = np.flatnonzero(~ahead)
+                switch = start + (behind[-1] + 1 if len(behind) else 0)
+                switch = max(start, switch - int(round(params["gap_shift_s"] * FPS)))
+        out_frames.append(switch)
+        out_teams.append(new)
+    return np.array(out_frames, dtype=int), np.array(out_teams, dtype="<U1")
+
+
 def strength_threshold(tracking, params):
     """min_strength in m/s: absolute, or min_strength_rel times this match's 90th percentile."""
     rel = params.get("min_strength_rel")
@@ -190,6 +281,10 @@ def all_touches(tracking, params):
                                  params.get("leave_m", 0.0))
     re_frames, re_teams = find_reappearances(
         tracking, int(round(params.get("reappear_s", 0.0) * FPS)), params["radius_m"])
+    if params.get("gap_rule", "off") != "off":
+        gap_frames, gap_teams = gap_switches(tracking, params, frames, teams)
+        re_frames = np.concatenate((re_frames, gap_frames)).astype(int)
+        re_teams = np.concatenate((re_teams, gap_teams))
     if len(re_frames):
         frames = np.concatenate((frames, re_frames))
         teams = np.concatenate((teams, re_teams))
@@ -251,14 +346,22 @@ class LastTouch:
         return self.predict_with(tracking, self.params)
 
     def fit(self, train):
-        """Try every grid combination on the training games; keep the best mean spellF1."""
+        """Try every GRID combination on the training games and keep the best mean spellF1; then,
+        with those fixed, the best of GAP_CANDIDATES."""
+        def score(params):
+            return float(np.mean([pm.evaluate(gt, pm.label_codes(self.predict_with(tracking, params)))
+                                  ["spell_f1_mean"] for tracking, gt in train]))
         best, best_score = None, -1.0
         for values in itertools.product(*GRID.values()):
-            params = dict(zip(GRID.keys(), values))
-            scores = [pm.evaluate(gt, pm.label_codes(self.predict_with(tracking, params)))
-                      ["spell_f1_mean"] for tracking, gt in train]
-            score = float(np.mean(scores))
-            if score > best_score:
-                best, best_score = params, score
+            params = dict(DEFAULTS, **dict(zip(GRID.keys(), values)))
+            value = score(params)
+            if value > best_score:
+                best, best_score = params, value
+        base = best
+        for gap in GAP_CANDIDATES:
+            params = dict(base, **gap)
+            value = score(params)
+            if value > best_score:
+                best, best_score = params, value
         self.params = best
         print("    fit: {} (train spellF1 {:.3f})".format(best, best_score))
