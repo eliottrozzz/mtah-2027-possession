@@ -36,7 +36,7 @@ import possession_metrics as pm  # noqa: E402
 
 # Params
 MAX_SPEED = 12.0              # m/s; a player "moving" faster than this is a track swap
-SPEED_STEP_S = 0.2            # measure player movement over this long, so per-frame wobble in
+SPEED_STEP_S = 0.4            # measure player movement over this long, so per-frame wobble in
                               # the tracking cancels out instead of looking like running
 WALK_SPEED = 2.0              # m/s, relative units after normalising (see frame_features)
 SPRINT_SPEED = 3.5
