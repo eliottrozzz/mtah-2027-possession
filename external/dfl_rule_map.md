@@ -12,6 +12,8 @@ Last aligned with: **`answer-key-v1`** (commit 7abc54d on `main`).
 |---|---|---|
 | A deliberate touch gives that team the ball | `POSSESSION_TYPES` (PASS, SHOT, RECOVERY, CARRY, SET PIECE) | `ds.TOUCH_TAGS` (Play, ShotAtGoal, OtherBallAction, BallClaiming) and the restart kick, in the touch timeline of `label_match` |
 | Duels and challenges don't switch on their own | CHALLENGE, BALL LOST, CARD not in `POSSESSION_TYPES` | TacklingGame, BallDeflection not in `TOUCH_TAGS` |
+| A won duel that claims the ball switches | CHALLENGE WON followed by a logged RECOVERY | TacklingGame `WinnerResult=ballClaimed`: a touch by the winner (`duels` in `label_match`) |
+| Collecting an opponent's loose pass or clearance switches at the collection | Logged as RECOVERY | Not logged by DFL: placed from the tracking between the two teams' logged touches (`received` in `label_match`); the log decides who, the tracking when |
 | Deflections and blocks don't switch | `demote_blocks_and_saves`: RECOVERY BLOCKED becomes a deflection | BallClaiming `Type=Block` skipped; the defending touch within `BLOCK_S` after a BlockedShot skipped |
 | A save switches only if the defenders play next | `demote_blocks_and_saves`: SAVED kept only if the same team touches next | Implicit: a keeper's catch is a BallClaiming touch; a parry is a BallDeflection (no switch) |
 | Ball out of play: D from the crossing | BALL OUT, shot OUT: `end_frame` | `stop_of`, `OUT_RESTARTS`: first tracked crossing (`AT_LINE_M`); fallback decision time − typical gap |
@@ -56,5 +58,9 @@ rebuilding.
   not the system behind the ground truth, and stay a cross-check, not a key.
 * **Stoppage starts:** taken from DFL's flags since 2026-11-12, except where logged touches
   contradict them (6 stretches over 10 s remain, each with a touch logged inside DFL's stop).
-* **Possession switches:** two thirds match DFL's to the frame. DFL switches 2–10 s before us
-  338 times, most likely at touches the event log doesn't record (still open).
+* **Possession switches:** DFL switched 2–10 s before us 338 times. Most were opponents
+  collecting a misplaced pass or clearance, which DFL doesn't log; since 2026-11-13 the key
+  places those from the tracking, and won "ballClaimed" duels count. 199 remain, 163 of them
+  with the old team still playing the ball after DFL's switch: DFL's possession column seems to
+  switch when a player gets close, not at a touch, which POSSESSION_RULES.md rejects.
+  Agreement with DFL's flags: 89.4% before, 92.0% after.

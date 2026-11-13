@@ -19,6 +19,12 @@ Possession, switching at the snapped event row:
   TacklingGame (duels), BallDeflection: no change on their own, as Metrica's CHALLENGE.
   BallClaiming of Type Block: a keeper block is a deflection, no change.
   A touch by the defending team within BLOCK_S after a BlockedShot is the block: no change.
+  TacklingGame with WinnerResult ballClaimed: the winner's team has the ball (as Metrica's won
+  CHALLENGE + RECOVERY). Other duel results stay ignored.
+  Unlogged receptions: when one team's touch is followed by the other team's with no restart in
+  between, the switch moves to the new team's first touch in the tracking after the old team's
+  last one (player within ds.NEAR_M, ball speed change over ds.KICK_DV). The log decides who,
+  the tracking only when. Duels and receptions never move a stoppage.
 Dead ball, from:
   Throw-in, goal kick, corner: the frame the tracked ball crosses the line (a ball crossing in
   the air is out too; a ball stopping exactly on the line counts, as J03WQQ's tracking does).
@@ -104,7 +110,7 @@ def label_match(match, restart, out_gap=None):
     crossing = np.flatnonzero(outside[1:] & ~outside[:-1]) + 1
     column = {pid: i for i, pid in enumerate(game["player"])}
     how = {"crossing": 0, "fallback": 0, "foul": 0, "advantage": 0, "drop": 0,
-           "dfl_status_earlier": 0, "dfl_status_later": 0}
+           "dfl_status_earlier": 0, "dfl_status_later": 0, "duel_claimed": 0, "reception": 0}
     gaps = []  # (restart type, decision row - crossing row) where a crossing was found
 
     def lag_row(time_text):
@@ -133,12 +139,63 @@ def label_match(match, restart, out_gap=None):
                 blocked.add(j)
     touches = [t for t in touches if t[0] not in blocked]
     touches.sort(key=lambda t: t[1])
+    # Stoppages and restarts only trust touches that are logged and placed by the sync.
     touch_rows = np.array([t[1] for t in touches])
+
+    # The two rules below only change who has the ball, never where a stoppage starts.
+    # A duel the winner comes out of with the ball ("ballClaimed") is a deliberate touch by the
+    # winner, as Metrica logs a won challenge followed by a RECOVERY. Other duel results (a poke
+    # at the ball, a dribble past) stay ignored, like a tackle that only deflects the ball.
+    duels = []
+    for i, e in enumerate(events):
+        if e["tag"] == "TacklingGame" and e["attrs"].get("WinnerResult") == "ballClaimed":
+            side = team_side(info, e["attrs"].get("WinnerTeam"))
+            if side is not None:
+                duels.append((i, e["row"], side))
+    how["duel_claimed"] += len(duels)
+    timeline = sorted(touches + duels, key=lambda t: t[1])
+
+    # Unlogged receptions. The log notes passes but often not the opponent collecting a
+    # misplaced pass or a clearance, so the switch would only come at that player's next logged
+    # action, seconds late (Metrica logs the collection as a RECOVERY). When one team's touch is
+    # followed by the other team's, with no restart in between, the tracking places the switch:
+    # the first touch by the new team after the old team's last touch, where a touch is a player
+    # within ds.NEAR_M of the ball as it changes speed by more than ds.KICK_DV (the thresholds the
+    # frozen sync already uses), and a moment with players of both teams that close counts as
+    # the old team's. The log still decides which team gets the ball; the tracking only says when.
+    dv = ds.velocity_change(ds.metres(ball))
+    restart_rows = np.array(sorted(e["row"] for e in events if e["tag"] in RESTARTS))
+    team_cols = {s: np.flatnonzero(game["team"] == s) for s in ("H", "A")}
+
+    def near_ball(rows, side):
+        gap = ds.metres(game["players"][rows][:, team_cols[side]]) \
+            - ds.metres(ball[rows])[:, None, :]
+        d = np.hypot(gap[..., 0], gap[..., 1])
+        return np.nanmin(np.where(np.isnan(d), np.inf, d), axis=1) < ds.NEAR_M
+
+    received = []
+    for (_, row, side), (_, next_row, next_side) in zip(timeline, timeline[1:]):
+        if next_side == side or next_row - row <= RECEIVE_MIN_FRAMES:
+            continue
+        if np.any((restart_rows > row) & (restart_rows <= next_row)):
+            continue
+        rows = np.arange(row + RECEIVE_MIN_FRAMES, next_row)
+        rows = rows[dv[rows] > ds.KICK_DV]
+        if not len(rows):
+            continue
+        old, new = near_ball(rows, side), near_ball(rows, next_side)
+        if old.any():
+            after = rows > rows[old][-1]
+            rows, new = rows[after], new[after]
+        if new.any():
+            received.append((-1, int(rows[np.argmax(new)]), next_side))
+    how["reception"] += len(received)
+    timeline = sorted(timeline + received, key=lambda t: t[1])
 
     labels = np.full(n, "X", dtype="<U1")
     labels[period > 0] = "D"
-    for k, (_, row, side) in enumerate(touches):
-        end = touches[k + 1][1] if k + 1 < len(touches) else n
+    for k, (_, row, side) in enumerate(timeline):
+        end = timeline[k + 1][1] if k + 1 < len(timeline) else n
         labels[row:end] = side
     labels[period == 0] = "X"
     for half in (1, 2):  # nothing before the first touch of a half is live
