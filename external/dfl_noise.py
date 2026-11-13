@@ -1,7 +1,8 @@
 """Noisy copies of the DFL sealed test games, made exactly like the Metrica ones.
 
 Reuses metrica_noise.py (same calibration, smoothing, wobble, random gaps, ball shown in some
-stoppages, broken player tracks). Only what the DFL data needs is different:
+stoppages and carried to the restart, broken player tracks). make_noisy() repeats metrica_noise's
+steps in the same order: when a step is added there, add it here and rebuild. Only what the DFL data needs is different:
 
   * DFL tracks the ball during stoppages too; Metrica's clean data mostly doesn't. So the ball is
     first deleted on every dead frame of the answer key (agreed with Jordan, 2026-11-11), then the
@@ -94,6 +95,7 @@ def make_noisy(match, level, seed=SEED):
     ball[reason > 1] = np.nan
     ball = mn.show_ball_in_stoppages(ball, labels, rng)
     reason[(reason == 1) & ~np.isnan(ball[:, 0])] = 4
+    ball = mn.carry_dead_ball(ball, labels, rng)       # as in metrica_noise: carried, not still
     ball = mn.jitter(ball, mn.BALL_JITTER_M, rng)
 
     players, teams = mn.break_tracks(clean, rng)
