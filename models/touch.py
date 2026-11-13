@@ -73,6 +73,20 @@ GAP_CANDIDATES = [{"gap_rule": "off"}] + [
     {"gap_rule": "line", "gap_min_s": g, "gap_line_m": 3.0} for g in (2.0, 3.0, 5.0)] + [
     {"gap_rule": "advance", "gap_min_s": g, "gap_shift_s": k}
     for g in (2.0, 3.0, 5.0) for k in (0.0, 1.0, 2.0)]
+# Deflection window, fitted last with everything else fixed (step 3 of the module docstring).
+# (0.5,) keeps the 2026-11-11 rule decision. Longer windows were tried 2026-11-13 (Track C, false
+# switches) as an information run only: Metrica's key logs fewer quick touches than the
+# organisers, so it prefers long windows, and the public ground truth counts single touches of
+# about 0.8 s, so nothing above 0.75 s may be kept (Jordan, 2026-11-13).
+DEFLECTION_CANDIDATES = (0.5,)
+# Confirmed switches (Track C, 2026-11-13): a touch by the other team only switches possession
+# if the ball then either moves away from where the toucher was, by confirm_away_m and steadily
+# (a pass or clearance), or stays with the toucher (a dribble), within confirm_s. Otherwise it is
+# treated as a deflection. Physics only, never "who touches next", so a single deliberate touch
+# such as a clearance still counts (public ground truth). Unseen ball in the window: kept.
+# Fitted last, with everything else fixed; "off" is a candidate.
+CONFIRM_CANDIDATES = ({"confirm": "off"},)
+CONFIRM_STEADY = 0.7            # share of frames the distance must grow on
 ADVANCE_STEP_S = 1.0            # team centre velocity measured over this long
 ADVANCE_SMOOTH_S = 2.0          # then averaged over this long
 STRENGTH_QUANTILE = 0.9
@@ -279,6 +293,8 @@ def all_touches(tracking, params):
                                  params["radius_m"],
                                  params["window"], params.get("assign", "at"),
                                  params.get("leave_m", 0.0))
+    # Only real touches need confirming; reappearances and gap switches have no ball to check.
+    frames, teams = confirm_switches(tracking, frames, teams, params)
     re_frames, re_teams = find_reappearances(
         tracking, int(round(params.get("reappear_s", 0.0) * FPS)), params["radius_m"])
     if params.get("gap_rule", "off") != "off":
@@ -291,6 +307,47 @@ def all_touches(tracking, params):
         order = np.argsort(frames, kind="stable")
         frames, teams = frames[order], teams[order]
     return drop_deflections(frames, teams, int(params["deflection_s"] * FPS))
+
+
+def confirmed(tracking, frame, team, params):
+    """True if the touch at `frame` by `team` looks like control: see CONFIRM_CANDIDATES."""
+    k = int(round(params["confirm_s"] * FPS))
+    ball = tracking["ball"]
+    if frame + k >= len(ball):
+        return True
+    path = ball[frame:frame + k + 1] * PITCH
+    if np.isnan(path).any():
+        return True                                   # can't tell: keep the touch
+    cols = np.flatnonzero(tracking["team"] == team)
+    players = tracking["players"][frame, cols] * PITCH
+    d0 = np.hypot(*(players - path[0]).T)
+    if not np.isfinite(d0).any():
+        return True
+    p = int(np.nanargmin(d0))
+    start = players[p]
+    away = np.hypot(*(path - start).T)
+    growing = np.mean(np.diff(away) > 0)
+    if away[-1] - away[0] >= params["confirm_away_m"] and growing >= CONFIRM_STEADY:
+        return True                                   # passed or cleared away from the toucher
+    follow = tracking["players"][frame:frame + k + 1, cols[p]] * PITCH
+    near = np.hypot(*(follow - path).T)
+    return bool(np.all(np.nan_to_num(near, nan=np.inf) <= params["radius_m"]))  # dribbling
+
+
+def confirm_switches(tracking, frames, teams, params):
+    """Drop touches that would switch possession but aren't confirmed (CONFIRM_CANDIDATES)."""
+    if params.get("confirm", "off") == "off" or len(frames) < 2:
+        return frames, teams
+    keep = np.ones(len(frames), dtype=bool)
+    holder = teams[0]
+    for i in range(1, len(frames)):
+        if teams[i] == holder:
+            continue
+        if confirmed(tracking, int(frames[i]), teams[i], params):
+            holder = teams[i]
+        else:
+            keep[i] = False
+    return frames[keep], teams[keep]
 
 
 def drop_deflections(frames, teams, deflection_frames):
@@ -330,8 +387,11 @@ def possession_from_touches(n, frames, teams):
 class LastTouch:
     name = "touch_v1"
 
-    def __init__(self, **params):
+    def __init__(self, deflection_candidates=DEFLECTION_CANDIDATES,
+                 confirm_candidates=CONFIRM_CANDIDATES, **params):
         self.params = dict(DEFAULTS, **params)
+        self.deflection_candidates = tuple(deflection_candidates)
+        self.confirm_candidates = tuple(confirm_candidates)
 
     def settings(self):
         return dict(self.params)
@@ -360,6 +420,22 @@ class LastTouch:
         base = best
         for gap in GAP_CANDIDATES:
             params = dict(base, **gap)
+            value = score(params)
+            if value > best_score:
+                best, best_score = params, value
+        base = best
+        for deflection_s in self.deflection_candidates:
+            if deflection_s == base["deflection_s"]:
+                continue
+            params = dict(base, deflection_s=deflection_s)
+            value = score(params)
+            if value > best_score:
+                best, best_score = params, value
+        base = best
+        for confirm in self.confirm_candidates:
+            if confirm.get("confirm", "off") == "off":
+                continue                              # base is already "off"
+            params = dict(base, **confirm)
             value = score(params)
             if value > best_score:
                 best, best_score = params, value

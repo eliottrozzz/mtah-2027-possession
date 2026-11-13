@@ -204,3 +204,38 @@ class TouchDeadShapeUnseen(TouchDeadShape):
     everywhere version failed the clean guard)."""
     name = "touch_dead_v3_shape_unseen"
     only_unseen = True
+
+
+class TouchDeadShapeUnseenDeflection(TouchDeadShapeUnseen):
+    """v3.1 with the deflection window fitted from (0.5, 0.75, 1.0, 1.5): an information run
+    (Track C, 2026-11-13). Picks above 0.75 s can't be kept (see DEFLECTION_CANDIDATES)."""
+    name = "v3.1_deflection_grid"
+
+    def __init__(self):
+        super().__init__()
+        self.touch = LastTouch(deflection_candidates=(0.5, 0.75, 1.0, 1.5))
+
+
+class TouchDeadShapeUnseenDeflectionCap(TouchDeadShapeUnseen):
+    """v3.1 with the deflection window fitted from (0.5, 0.75): the keepable version."""
+    name = "v3.1_deflection_cap075"
+
+    def __init__(self):
+        super().__init__()
+        self.touch = LastTouch(deflection_candidates=(0.5, 0.75))
+
+
+class TouchDeadShapeUnseenConfirm(TouchDeadShapeUnseen):
+    """v3.1 plus confirmed switches (models/touch.py CONFIRM_CANDIDATES), "off" included, picked by
+    fit (Track C, 2026-11-13)."""
+    name = "v3.1_confirm_switch"
+
+    def __init__(self):
+        super().__init__()
+        self.touch = LastTouch(confirm_candidates=(
+            {"confirm": "off"},
+            {"confirm": "on", "confirm_s": 0.5, "confirm_away_m": 1.0},
+            {"confirm": "on", "confirm_s": 0.5, "confirm_away_m": 2.0},
+            {"confirm": "on", "confirm_s": 0.75, "confirm_away_m": 2.0},
+            {"confirm": "on", "confirm_s": 0.75, "confirm_away_m": 3.0},
+            {"confirm": "on", "confirm_s": 1.0, "confirm_away_m": 4.0}))
