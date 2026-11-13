@@ -204,3 +204,45 @@ class TouchDeadShapeUnseen(TouchDeadShape):
     everywhere version failed the clean guard)."""
     name = "v3.1"  # was touch_dead_v3_shape_unseen (runs before 2026-11-13 21:30 use that name)
     only_unseen = True
+
+
+# Seen-ball tier: a much stricter override where the ball is tracked (main session / Jordan,
+# 2026-11-13: the everywhere override gained most but failed the clean guard).
+SEEN_GRID = [{"sure": None}] + [{"sure": s, "min_s": m} for s in (0.45, 0.48) for m in (2.0, 4.0)]
+
+
+class TouchDeadShapeTwoTier(TouchDeadShapeUnseen):
+    """1b where the ball is unseen, plus a stricter override (95%+ or 98%+ sure, 2 s+) where it is
+    seen. Both tiers are picked together by train spellF1."""
+    name = "touch_dead_v3_shape_2tier"
+
+    def __init__(self):
+        super().__init__()
+        self.override_seen = {"sure": None}
+
+    def settings(self):
+        return dict(super().settings(), override_seen=dict(self.override_seen))
+
+    def apply(self, labels, p_home, unseen, unseen_params, seen_params):
+        labels = shape_override(labels, p_home, unseen_params, unseen)
+        return shape_override(labels, p_home, seen_params, ~unseen)
+
+    def fit(self, train):
+        TouchDead.fit(self, train)
+        self.prior.fit(train)
+        parts = [(self.predict_v3(tr), self.prior.predict_proba(tr), self.allowed(tr), gt)
+                 for tr, gt in train]
+        best, best_score = None, -1.0
+        for unseen_params, seen_params in itertools.product(OVERRIDE_GRID, SEEN_GRID):
+            score = float(np.mean([
+                pm.evaluate(gt, pm.label_codes(self.apply(lab, p, ok, unseen_params, seen_params)))
+                ["spell_f1_mean"] for lab, p, ok, gt in parts]))
+            if score > best_score:
+                best, best_score = (unseen_params, seen_params), score
+        self.override, self.override_seen = best
+        print("    override unseen: {}, seen: {} (train spellF1 {:.3f})".format(
+            best[0], best[1], best_score))
+
+    def predict(self, tracking):
+        return self.apply(self.predict_v3(tracking), self.prior.predict_proba(tracking),
+                          self.allowed(tracking), self.override, self.override_seen)
