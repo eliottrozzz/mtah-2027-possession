@@ -185,6 +185,7 @@ def measure(game=GAME, data_dir=None):
         "player_jitter_m": wobble_m(players_graded, pitch),
         # Window 4 under "touch_strength_quantiles" (read by calibrate()), plus windows 8, 12.
         **ts.touch_signal(ball_graded),
+        **ts.still_signal(ball_graded, int(graded.sum())),
     }
 
 
@@ -213,6 +214,7 @@ def show(stats):
     print("jitter (m per frame): ball {:.3f}, players {:.3f}".format(
         stats["ball_jitter_m"], stats["player_jitter_m"]))
     ts.show(stats)
+    ts.show_still(stats)
 
 
 def main():
