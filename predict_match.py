@@ -28,7 +28,7 @@ import numpy as np
 ROOT = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, ROOT)
 sys.path.insert(0, os.path.join(ROOT, "evaluation"))
-from games import GAME, half_video_blocks, id_to_video, require, source_frames  # noqa: E402
+from games import GAME, half_video_blocks, require, source_frames  # noqa: E402
 import score_external as se  # noqa: E402
 
 # Params
@@ -106,9 +106,10 @@ def read_match(game=GAME, data_dir=None):
     """The provided match's tracking, one row per video frame, in the shared format."""
     meta_path, raw_path = require(["atd_meta", "atd_raw"], game, data_dir)
     n = source_frames("tactical", game)
-    # The ATD counts IdFrame (about 1.7 million), with a different offset to the video in each
-    # half (games.py), so map every line through id_to_video; halftime ids give None.
-    tracking = read_epts(meta_path, raw_path, n, lambda frame_id: id_to_video(game, frame_id))
+    # The tactical ATD is already on the video's timeline, one record per video frame numbered
+    # from 1 (starter/load_atd.py checks this), so video frame = frame_id - 1. The IdFrame
+    # offsets in games.py are for other files, not this one.
+    tracking = read_epts(meta_path, raw_path, n, lambda frame_id: frame_id - 1)
     period = np.zeros(n, dtype=np.int8)
     for half, first, last in half_video_blocks(game):
         period[first:last + 1] = half
