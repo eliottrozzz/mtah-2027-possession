@@ -8,7 +8,10 @@ the key models are tuned on. Event times are first put on the tracking clock by 
     python external/dfl_labels.py --restart kick      # ... or at the kick
 
 Writes data/external/dfl/{match}_labels_{reception|kick}.csv, plus {match}_labels_dfl_provider.csv
-(DFL's own per-frame BallStatus and BallPossession, for comparison only; never a key we score on).
+(DFL's own per-frame BallStatus and BallPossession; never a key we score on). Note that our key
+takes its stoppage starts from that BallStatus (see "Then every stoppage start" below), so overall
+agreement with it is partly by construction. The independent check is "same team": who has the
+ball on frames both keys call live, which ours decides from the log and tracking alone.
 Rows are tracking rows (dfl_tracking.py), so row i of the labels is row i of the tracking.
 
 How the rules map onto DFL events (decisions agreed with Jordan, 2026-11-11)
@@ -47,9 +50,11 @@ Until:
   at the kick.
   --restart kick: the kick.
 
-Known limits (see external/README.md): touches DFL doesn't log can't switch possession (the switch
-comes at the next logged touch, as in Metrica); about 5% of touches keep a lag-corrected time
-(+-1 s); foul stoppages keep the log's +-0.7 s scatter; drop-ball stoppage starts are a guess.
+Known limits (see external/README.md): an unlogged touch can only switch possession through the
+reception rule above (team change between logged touches), otherwise the switch comes at the next
+logged touch, as in Metrica; about 5% of touches keep a lag-corrected time (+-1 s); claimed duels
+are never snapped (one ball, two players), so their switch keeps the log's +-0.7 s scatter, as do
+foul stoppages where DFL's ball status doesn't move them; drop-ball stoppage starts are a guess.
 
 This answer key is frozen before any model is scored on it. Change a rule for a football reason,
 never because a model scores better under it.
@@ -371,8 +376,12 @@ def describe(match, labels, how=None, provider=None):
     flag = "" if METRICA_DEAD[0] <= dead <= METRICA_DEAD[1] else "  <-- dead share outside Metrica's"
     extra = ""
     if provider is not None:
-        extra += "  agrees with dfl_provider {:.0%}".format(float(np.mean(labels[graded]
-                                                                           == provider[graded])))
+        # Overall agreement is partly by construction (stoppage starts come from DFL's status);
+        # "same team" on frames both call live is the independent part.
+        live = graded & np.isin(labels, ["H", "A"]) & np.isin(provider, ["H", "A"])
+        extra += "  agrees with dfl_provider {:.0%} (same team when both live {:.0%})".format(
+            float(np.mean(labels[graded] == provider[graded])),
+            float(np.mean(labels[live] == provider[live])))
     if how:
         extra += "  stops: " + ", ".join("{} {}".format(k, v) for k, v in how.items()
                                          if v and k != "gaps")
