@@ -1,0 +1,304 @@
+{
+ "model": "v3.1_deflection_grid",
+ "spec": "models.touch_dead:TouchDeadShapeUnseenDeflection",
+ "settings": {
+  "touch": {
+   "min_strength": 1.0,
+   "min_strength_rel": null,
+   "radius_m": 3.5,
+   "window": 12,
+   "assign": "at",
+   "deflection_s": 1.5,
+   "reappear_s": 0.2,
+   "leave_m": 0.0,
+   "gap_rule": "advance",
+   "gap_min_s": 5.0,
+   "gap_shift_s": 1.0
+  },
+  "dead": {
+   "windows_s": [
+    2,
+    8,
+    20
+   ],
+   "side_window_s": 6,
+   "l2": 1.0,
+   "max_gap_frames": 100,
+   "carry_radius_m": 2.0,
+   "inputs": [
+    "median_speed",
+    "fast_speed",
+    "walking",
+    "sprinting",
+    "shape_moving",
+    "gathered",
+    "at_touchline",
+    "ball_out",
+    "ball_still",
+    "still_stretch",
+    "out_then_still"
+   ],
+   "post": {
+    "threshold": 0.55,
+    "min_dead_s": 4,
+    "min_live_s": 2
+   },
+   "post_grid": {
+    "threshold": [
+     0.35,
+     0.45,
+     0.55,
+     0.65
+    ],
+    "min_dead_s": [
+     2,
+     4,
+     8,
+     12
+    ],
+    "min_live_s": [
+     2,
+     4,
+     8,
+     12
+    ]
+   }
+  },
+  "restart_from_next_touch": true,
+  "snap": {
+   "snap": "first",
+   "snap_s": 1.0
+  },
+  "shape": {
+   "windows_s": [
+    1,
+    4,
+    12
+   ],
+   "side_window_s": 6,
+   "forward_step_s": 1.0,
+   "signals": [
+    "spread_x",
+    "spread_y",
+    "depth",
+    "forward"
+   ]
+  },
+  "override": {
+   "sure": 0.3,
+   "min_s": 4.0
+  },
+  "only_unseen": true
+ },
+ "seed": 0,
+ "who": "agentC",
+ "note": "false switches step 1, information only: deflection window fitted from (0.5-1.5); picks above 0.75 s not keepable",
+ "time": "2026-11-13T22:09:13",
+ "branch": "jordan/switch-confirm",
+ "commit": "79c54df00c1dff885a5a4e1cea0763699d52c928",
+ "dirty": false,
+ "headline": 0.5293158881319483,
+ "per_game": {
+  "1": 0.5461296671165092,
+  "2": 0.5315798521574695,
+  "3": 0.510238145121866
+ },
+ "cells": {
+  "1": {
+   "reception": {
+    "20": {
+     "spell_f1": 0.5664473684210527,
+     "macro_f1": 0.8698592046943721,
+     "n_gt_spells": 317,
+     "n_pred_spells": 291,
+     "spell_f1_range": [
+      0.5255592105263157,
+      0.6092763157894736
+     ]
+    },
+    "35": {
+     "spell_f1": 0.5258119658119658,
+     "macro_f1": 0.8478423209774326,
+     "n_gt_spells": 317,
+     "n_pred_spells": 268,
+     "spell_f1_range": [
+      0.4799316239316239,
+      0.5675897435897436
+     ]
+    },
+    "50": {
+     "spell_f1": 0.49727891156462584,
+     "macro_f1": 0.8537205660374617,
+     "n_gt_spells": 317,
+     "n_pred_spells": 271
+    },
+    "clean": {
+     "spell_f1": 0.6851351351351351,
+     "macro_f1": 0.8743810364682977,
+     "n_gt_spells": 317,
+     "n_pred_spells": 275
+    }
+   },
+   "kick": {
+    "20": {
+     "spell_f1": 0.5452229299363057,
+     "macro_f1": 0.8560721276214931,
+     "n_gt_spells": 337,
+     "n_pred_spells": 291
+    },
+    "35": {
+     "spell_f1": 0.503801652892562,
+     "macro_f1": 0.8369040219670736,
+     "n_gt_spells": 337,
+     "n_pred_spells": 268
+    },
+    "50": {
+     "spell_f1": 0.480921052631579,
+     "macro_f1": 0.8402423771735924,
+     "n_gt_spells": 337,
+     "n_pred_spells": 271
+    },
+    "clean": {
+     "spell_f1": 0.7045751633986927,
+     "macro_f1": 0.8889408874231236,
+     "n_gt_spells": 337,
+     "n_pred_spells": 275
+    }
+   }
+  },
+  "2": {
+   "reception": {
+    "20": {
+     "spell_f1": 0.5238095238095238,
+     "macro_f1": 0.8501272865668544,
+     "n_gt_spells": 288,
+     "n_pred_spells": 300,
+     "spell_f1_range": [
+      0.48421768707483,
+      0.5639455782312925
+     ]
+    },
+    "35": {
+     "spell_f1": 0.5393501805054151,
+     "macro_f1": 0.8451506643216979,
+     "n_gt_spells": 288,
+     "n_pred_spells": 266,
+     "spell_f1_range": [
+      0.5032129963898916,
+      0.5878339350180505
+     ]
+    },
+    "50": {
+     "spell_f1": 0.49582577132486383,
+     "macro_f1": 0.8430704520612089,
+     "n_gt_spells": 288,
+     "n_pred_spells": 263
+    },
+    "clean": {
+     "spell_f1": 0.7232974910394264,
+     "macro_f1": 0.8825355163346106,
+     "n_gt_spells": 288,
+     "n_pred_spells": 270
+    }
+   },
+   "kick": {
+    "20": {
+     "spell_f1": 0.5054365733113674,
+     "macro_f1": 0.8424064210690952,
+     "n_gt_spells": 307,
+     "n_pred_spells": 300
+    },
+    "35": {
+     "spell_f1": 0.5249563699825479,
+     "macro_f1": 0.8366696721342916,
+     "n_gt_spells": 307,
+     "n_pred_spells": 266
+    },
+    "50": {
+     "spell_f1": 0.48,
+     "macro_f1": 0.8322608527430576,
+     "n_gt_spells": 307,
+     "n_pred_spells": 263
+    },
+    "clean": {
+     "spell_f1": 0.7285961871750434,
+     "macro_f1": 0.8887553636698443,
+     "n_gt_spells": 307,
+     "n_pred_spells": 270
+    }
+   }
+  },
+  "3": {
+   "reception": {
+    "20": {
+     "spell_f1": 0.5255813953488373,
+     "macro_f1": 0.8522224693957011,
+     "n_gt_spells": 364,
+     "n_pred_spells": 324,
+     "spell_f1_range": [
+      0.48313953488372097,
+      0.5668604651162791
+     ]
+    },
+    "35": {
+     "spell_f1": 0.4948948948948949,
+     "macro_f1": 0.8461066533611198,
+     "n_gt_spells": 364,
+     "n_pred_spells": 302,
+     "spell_f1_range": [
+      0.4545645645645646,
+      0.5357357357357356
+     ]
+    },
+    "50": {
+     "spell_f1": 0.48517350157728717,
+     "macro_f1": 0.8385937911976814,
+     "n_gt_spells": 364,
+     "n_pred_spells": 270
+    },
+    "clean": {
+     "spell_f1": 0.6540458015267177,
+     "macro_f1": 0.8664184753140703,
+     "n_gt_spells": 364,
+     "n_pred_spells": 291
+    }
+   },
+   "kick": {
+    "20": {
+     "spell_f1": 0.5068181818181817,
+     "macro_f1": 0.8416537083223466,
+     "n_gt_spells": 380,
+     "n_pred_spells": 324
+    },
+    "35": {
+     "spell_f1": 0.4750733137829912,
+     "macro_f1": 0.8337077024688381,
+     "n_gt_spells": 380,
+     "n_pred_spells": 302
+    },
+    "50": {
+     "spell_f1": 0.46892307692307683,
+     "macro_f1": 0.8271407871666524,
+     "n_gt_spells": 380,
+     "n_pred_spells": 270
+    },
+    "clean": {
+     "spell_f1": 0.6742175856929954,
+     "macro_f1": 0.8751104695678668,
+     "n_gt_spells": 380,
+     "n_pred_spells": 291
+    }
+   }
+  }
+ },
+ "keep_rule": {
+  "against": "20261113-220913_v3.1_deflection_cap075_seed0.json",
+  "against_model": "v3.1_deflection_cap075",
+  "headline_gain": 0.038,
+  "drops_over_limit": {
+   "game3 reception clean": 0.0665,
+   "game3 kick clean": 0.083
+  },
+  "keep": false
+ }
+}
