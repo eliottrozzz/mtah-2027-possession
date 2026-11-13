@@ -202,5 +202,5 @@ class TouchDeadShapeUnseen(TouchDeadShape):
     """The override only on frames where the ball isn't tracked: when the ball is seen, its
     touches are trusted; when it isn't, the team shapes decide (Jordan, 2026-11-13, after the
     everywhere version failed the clean guard)."""
-    name = "touch_dead_v3_shape_unseen"
+    name = "v3.1"  # was touch_dead_v3_shape_unseen (runs before 2026-11-13 21:30 use that name)
     only_unseen = True
