@@ -139,15 +139,18 @@ OVERRIDE_GRID = [{"sure": None}] + [{"sure": s, "min_s": m}
                                     for s in (0.3, 0.35, 0.4, 0.45) for m in (0.5, 1.0, 2.0, 4.0)]
 
 
-def shape_override(labels, p_home, params):
+def shape_override(labels, p_home, params, allowed=None):
     """labels with live frames switched to the prior's team where it is more than 0.5 + sure
-    confident, disagrees, and does so for at least min_s in a row. D frames are never touched."""
+    confident, disagrees, and does so for at least min_s in a row. D frames are never touched,
+    and with allowed given, only those frames can change."""
     if params["sure"] is None:
         return labels
     labels = labels.copy()
     prior = np.where(p_home > 0.5, "H", "A")
     flip = (np.isin(labels, ["H", "A"]) & (prior != labels)
             & (np.abs(p_home - 0.5) > params["sure"]))
+    if allowed is not None:
+        flip &= allowed
     for start, stop in runs(flip):
         if stop - start >= params["min_s"] * FPS:
             labels[start:stop] = prior[start:stop]
@@ -157,6 +160,7 @@ def shape_override(labels, p_home, params):
 class TouchDeadShape(TouchDead):
     """v3 plus the team-shape override."""
     name = "touch_dead_v3_shape"
+    only_unseen = False         # override only where the ball isn't tracked (see below)
 
     def __init__(self):
         super().__init__()
@@ -164,18 +168,20 @@ class TouchDeadShape(TouchDead):
         self.override = {"sure": None}
 
     def settings(self):
-        return dict(super().settings(), shape=self.prior.settings(), override=dict(self.override))
+        return dict(super().settings(), shape=self.prior.settings(), override=dict(self.override),
+                    only_unseen=self.only_unseen)
 
     def fit(self, train):
         super().fit(train)
         self.prior.fit(train)
         # Tuned last, on top of everything else; the expensive parts run once.
-        parts = [(self.predict_v3(tr), self.prior.predict_proba(tr), gt) for tr, gt in train]
+        parts = [(self.predict_v3(tr), self.prior.predict_proba(tr), self.allowed(tr), gt)
+                 for tr, gt in train]
         best, best_score = None, -1.0
         for params in OVERRIDE_GRID:
             score = float(np.mean([
-                pm.evaluate(gt, pm.label_codes(shape_override(lab, p, params)))["spell_f1_mean"]
-                for lab, p, gt in parts]))
+                pm.evaluate(gt, pm.label_codes(shape_override(lab, p, params, ok)))
+                ["spell_f1_mean"] for lab, p, ok, gt in parts]))
             if score > best_score:
                 best, best_score = params, score
         self.override = best
@@ -184,6 +190,17 @@ class TouchDeadShape(TouchDead):
     def predict_v3(self, tracking):
         return super().predict(tracking)
 
+    def allowed(self, tracking):
+        return np.isnan(tracking["ball"][:, 0]) if self.only_unseen else None
+
     def predict(self, tracking):
         return shape_override(self.predict_v3(tracking), self.prior.predict_proba(tracking),
-                              self.override)
+                              self.override, self.allowed(tracking))
+
+
+class TouchDeadShapeUnseen(TouchDeadShape):
+    """The override only on frames where the ball isn't tracked: when the ball is seen, its
+    touches are trusted; when it isn't, the team shapes decide (Jordan, 2026-11-13, after the
+    everywhere version failed the clean guard)."""
+    name = "touch_dead_v3_shape_unseen"
+    only_unseen = True
