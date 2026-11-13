@@ -8,9 +8,10 @@ standard live20/35 seed-0 copies, reception key), then predicts each test game o
     python evaluation/stress_test.py --model models.touch_dead:TouchDead
     python evaluation/stress_test.py --model models.touch_dead:TouchDead --variants calibrated blur_longer wobble
 
-Most variants change one noise setting. The two "moving ball" variants instead edit the copy after
-it is made: the ball shown during stoppages is replaced by a ball being carried to the restart
-(see carried_ball).
+Most variants change one noise setting. In the copies, a ball shown in a stoppage is being carried
+to the restart (metrica_noise.carry_dead_ball); the stoppage_ball_* variants change that: never
+shown, shown in more stoppages, shown on every stoppage frame, lying still as in the old copies,
+or carried more slowly.
 
 The variants are a check, never a target: nothing is tuned on them and nothing is logged to
 results/runs/. Nothing is written to data/. External data only; the calibration file is the
@@ -38,11 +39,9 @@ import score_external as se  # noqa: E402
 LEVEL = 35
 SEED = 0
 CALIBRATION = os.path.join(ROOT, "data", "ball_gap_stats.json")
-CARRY_SPEED_MS = (1.0, 3.0)    # carried ball: walking to jogging pace, drawn per stoppage
-CARRY_TURN_PER_S = 1.0         # how fast it steers toward the restart spot
-CARRY_WANDER = 1.0             # random turning, radians per sqrt(second)
 SETTINGS = ("CUTS_PER_MINUTE", "BALL_SMOOTH_FRAMES", "GAP_QUANTILES_S", "MAX_LIVE_GAP_S",
-            "DEAD_VISIBLE_PROB", "PLAYER_JITTER_M", "AIR_DROP_PROB")
+            "DEAD_VISIBLE_PROB", "PLAYER_JITTER_M", "AIR_DROP_PROB", "CARRY_SPEED_MS",
+            "carry_dead_ball")
 
 
 def variants(base):
@@ -61,40 +60,23 @@ def variants(base):
                     {"GAP_QUANTILES_S": {k: v * 2 for k, v in base["GAP_QUANTILES_S"].items()},
                      "MAX_LIVE_GAP_S": base["MAX_LIVE_GAP_S"] * 2}, LEVEL),
         "missing65": ("ball missing on 65% of live frames", {}, 65),
-        "stoppage_ball_never": ("still ball never shown in stoppages",
-                                {"DEAD_VISIBLE_PROB": 0.0}, LEVEL),
-        "stoppage_ball_always": ("still ball always shown in stoppages",
-                                 {"DEAD_VISIBLE_PROB": 1.0}, LEVEL),
+        "stoppage_ball_never": ("ball never shown in stoppages", {"DEAD_VISIBLE_PROB": 0.0}, LEVEL),
+        "stoppage_ball_more": ("ball shown in every stoppage (for part of it)",
+                               {"DEAD_VISIBLE_PROB": 1.0}, LEVEL),
+        "stoppage_ball_every_frame": ("ball shown on every stoppage frame", {}, LEVEL,
+                                      carry_every_stoppage_frame),
+        "stoppage_ball_still": ("stoppage ball lying still (the old copies)",
+                                {"carry_dead_ball": lambda ball, labels, rng: ball}, LEVEL),
+        "stoppage_ball_slow": ("stoppage ball carried slowly (1-3 m/s, not 4-6)",
+                               {"CARRY_SPEED_MS": (1.0, 3.0)}, LEVEL),
         "wobble": ("player position wobble 0.1 m per frame", {"PLAYER_JITTER_M": 0.1}, LEVEL),
         "high_balls_lost": ("every high ball lost", {"AIR_DROP_PROB": 1.0}, LEVEL),
-        "moving_ball_stoppages": ("ball shown moving in stoppages (same share)", {}, LEVEL,
-                                  lambda data, labels, rng: move_dead_ball(data, labels, rng, False)),
-        "moving_ball_all_stoppages": ("ball shown moving on every stoppage frame", {}, LEVEL,
-                                      lambda data, labels, rng: move_dead_ball(data, labels, rng, True)),
     }
 
 
-def carried_ball(n, start, target, rng):
-    """(n, 2) path in metres: a ball carried from start toward target at a steady walking or
-    jogging pace, steering toward the target with some random wandering. Once there it keeps
-    circling near the spot (radius about speed / turn rate), so it never sits still."""
-    speed = rng.uniform(*CARRY_SPEED_MS)
-    pos, path = np.array(start, dtype=np.float64), np.empty((n, 2))
-    heading = np.arctan2(*(target - pos)[::-1]) + rng.normal(0.0, 0.5)
-    for i in range(n):
-        wanted = np.arctan2(*(target - pos)[::-1])
-        turn = (wanted - heading + np.pi) % (2 * np.pi) - np.pi
-        heading += CARRY_TURN_PER_S * turn / mn.FPS + rng.normal(0.0, CARRY_WANDER / np.sqrt(mn.FPS))
-        pos = pos + speed / mn.FPS * np.array([np.cos(heading), np.sin(heading)])
-        path[i] = pos
-    return path
-
-
-def move_dead_ball(data, labels, rng, every_frame):
-    """Replace the ball shown in stoppages (D frames) with a carried ball. It runs from the last
-    ball seen before the stoppage to the first seen after it (where play restarts), then gets
-    the copies' 0.84 s blur and usual jitter. every_frame=False keeps the frames on which the
-    copy showed a ball; True shows it on every stoppage frame."""
+def carry_every_stoppage_frame(data, labels, rng):
+    """Show the carried stoppage ball on every stoppage frame, not just where the copy shows one:
+    the same carry as the copies (metrica_noise.carried_ball), blurred and jittered like them."""
     ball, pitch = data["ball"].copy(), np.array(mn.mt.PITCH, dtype=np.float64)
     seen = np.flatnonzero(np.isfinite(ball[:, 0]))
     for start, stop in mn.runs(labels == "D"):
@@ -104,11 +86,10 @@ def move_dead_ball(data, labels, rng, every_frame):
         a = ball[before[-1]] if len(before) else ball[after[0]]
         b = ball[after[0]] if len(after) else a
         n = stop - start
-        path = carried_ball(n, a * pitch, b * pitch, rng) / pitch
+        path = mn.carried_ball(n, a * pitch, b * pitch, rng) / pitch
         blur = min(mn.BALL_SMOOTH_FRAMES, n if n % 2 else n - 1)   # odd, no longer than the stoppage
-        path = mn.jitter(mn.smooth(path, blur), mn.BALL_JITTER_M, rng)
-        shown = np.ones(n, bool) if every_frame else np.isfinite(ball[start:stop, 0])
-        ball[start:stop][shown] = path[shown]
+        path = mn.jitter(mn.smooth(path, max(blur, 1)), mn.BALL_JITTER_M, rng)
+        ball[start:stop] = path
     data["ball"] = ball
 
 

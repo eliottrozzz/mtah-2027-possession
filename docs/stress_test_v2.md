@@ -127,3 +127,48 @@ Current v2 (0.4 s player speeds), live35, seed 0:
 
   Without it, the variants score about the same as the calibrated copies (0.443–0.448), so
   `ball_still` accounts for the loss. `ball_out` matters little.
+
+## On the copies with a carried stoppage ball (2026-11-13)
+
+The copies now carry every stoppage ball shown to the restart at 4–6 m/s, a speed fitted to the
+real touch signal. The stoppage-ball variants were redone to match:
+- **never:** the ball is never shown in stoppages;
+- **more:** a ball is shown in every stoppage, for part of it;
+- **every frame:** a carried ball is shown on every stoppage frame;
+- **still:** the ball lies still, as in the old copies;
+- **slow:** the ball is carried at 1–3 m/s.
+
+Stress table, live35, the model before restart snapping (named v2 then, v3 at 0.460 now):
+
+| Variant | spellF1 (game 1 / 2 / 3) | Change | macroF1 |
+|---|---|---|---|
+| As calibrated | 0.450 (0.50 / 0.41 / 0.44) | — | 0.816 |
+| Track breaks ×2 / ×0.5 | 0.441 / 0.451 | −0.010 / +0.001 | 0.81 |
+| Ball blur ×0.5 / ×1.5 | 0.486 / 0.389 | +0.036 / −0.061 | 0.83 / 0.79 |
+| Random ball gaps ×2 | 0.433 | −0.017 | 0.81 |
+| Ball missing on 65% of live frames | 0.340 | −0.110 | 0.77 |
+| Stoppage ball never / more / every frame | 0.446 / 0.459 / 0.450 | −0.004 / +0.009 / 0.000 | 0.81–0.82 |
+| **Stoppage ball lying still (the old copies)** | **0.414** (0.46 / 0.38 / 0.41) | **−0.037** | **0.657** |
+| Stoppage ball carried slowly (1–3 m/s) | 0.433 | −0.017 | 0.793 |
+| Player wobble 0.1 m | 0.443 | −0.007 | 0.809 |
+| Every high ball lost | 0.470 | +0.019 | 0.819 |
+
+**Dead-ball detector and `ball_still`** (v3 with restart snapping, live35):
+- On the new copies the stoppage ball is never still: `ball_still` is 0.000 on dead frames and
+  0.036 on live ones.
+- So the detector now learns "still ball ⇒ live": the `ball_still` weights are negative
+  (round 1: −0.65, −0.33, 0.03, −0.37, −0.56). Physically that is backwards.
+
+| Copies | spellF1 | D share (true 0.428) | Dead precision / recall | Without `ball_still` |
+|---|---|---|---|---|
+| As calibrated | 0.456 | 0.411 | 0.90 / 0.87 | 0.443 (recall 0.85) |
+| Stoppage ball still | 0.417 | 0.224 | 0.88 / **0.46** | 0.457 (recall 0.85) |
+| Every stoppage frame | 0.450 | 0.422 | 0.90 / 0.89 | 0.434 |
+| Carried slowly | 0.439 | 0.371 | 0.92 / 0.79 | 0.442 |
+
+- Recall on the new copies is back to 0.87, against 0.88 on the old copies.
+- `ball_still` is worth +0.013 on the copies we score on.
+- If the real stoppage ball is ever still, though, it halves recall and the macroF1 drops to
+  0.66.
+- Blanking it at predict time keeps every variant at 0.434–0.457. That is the fitted model with
+  the feature treated as unmeasured, not a refit.
