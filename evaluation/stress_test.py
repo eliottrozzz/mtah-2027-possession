@@ -8,6 +8,11 @@ standard live20/35 seed-0 copies, reception key), then predicts each test game o
     python evaluation/stress_test.py --model models.touch_dead:TouchDead
     python evaluation/stress_test.py --model models.touch_dead:TouchDead --variants calibrated blur_longer wobble
 
+Most variants change one noise setting. In the copies, a ball shown in a stoppage is being carried
+to the restart (metrica_noise.carry_dead_ball); the stoppage_ball_* variants change that: never
+shown, shown in more stoppages, shown on every stoppage frame, lying still as in the old copies,
+or carried more slowly.
+
 The variants are a check, never a target: nothing is tuned on them and nothing is logged to
 results/runs/. Nothing is written to data/. External data only; the calibration file is the
 aggregate summary the standard copies were made with. The "calibrated" variant must reproduce the
@@ -35,11 +40,12 @@ LEVEL = 35
 SEED = 0
 CALIBRATION = os.path.join(ROOT, "data", "ball_gap_stats.json")
 SETTINGS = ("CUTS_PER_MINUTE", "BALL_SMOOTH_FRAMES", "GAP_QUANTILES_S", "MAX_LIVE_GAP_S",
-            "DEAD_VISIBLE_PROB", "PLAYER_JITTER_M", "AIR_DROP_PROB")
+            "DEAD_VISIBLE_PROB", "PLAYER_JITTER_M", "AIR_DROP_PROB", "CARRY_SPEED_MS",
+            "carry_dead_ball")
 
 
 def variants(base):
-    """name -> (description, settings to change, live level)."""
+    """name -> (description, settings to change, live level[, edit of the made copy])."""
     odd = lambda frames: max(1, int(frames) | 1)    # smoothing windows are odd
     return {
         "calibrated": ("as calibrated (the copies we score on)", {}, LEVEL),
@@ -54,13 +60,37 @@ def variants(base):
                     {"GAP_QUANTILES_S": {k: v * 2 for k, v in base["GAP_QUANTILES_S"].items()},
                      "MAX_LIVE_GAP_S": base["MAX_LIVE_GAP_S"] * 2}, LEVEL),
         "missing65": ("ball missing on 65% of live frames", {}, 65),
-        "stoppage_ball_never": ("still ball never shown in stoppages",
-                                {"DEAD_VISIBLE_PROB": 0.0}, LEVEL),
-        "stoppage_ball_always": ("still ball always shown in stoppages",
-                                 {"DEAD_VISIBLE_PROB": 1.0}, LEVEL),
+        "stoppage_ball_never": ("ball never shown in stoppages", {"DEAD_VISIBLE_PROB": 0.0}, LEVEL),
+        "stoppage_ball_more": ("ball shown in every stoppage (for part of it)",
+                               {"DEAD_VISIBLE_PROB": 1.0}, LEVEL),
+        "stoppage_ball_every_frame": ("ball shown on every stoppage frame", {}, LEVEL,
+                                      carry_every_stoppage_frame),
+        "stoppage_ball_still": ("stoppage ball lying still (the old copies)",
+                                {"carry_dead_ball": lambda ball, labels, rng: ball}, LEVEL),
+        "stoppage_ball_slow": ("stoppage ball carried slowly (1-3 m/s, not 4-6)",
+                               {"CARRY_SPEED_MS": (1.0, 3.0)}, LEVEL),
         "wobble": ("player position wobble 0.1 m per frame", {"PLAYER_JITTER_M": 0.1}, LEVEL),
         "high_balls_lost": ("every high ball lost", {"AIR_DROP_PROB": 1.0}, LEVEL),
     }
+
+
+def carry_every_stoppage_frame(data, labels, rng):
+    """Show the carried stoppage ball on every stoppage frame, not just where the copy shows one:
+    the same carry as the copies (metrica_noise.carried_ball), blurred and jittered like them."""
+    ball, pitch = data["ball"].copy(), np.array(mn.mt.PITCH, dtype=np.float64)
+    seen = np.flatnonzero(np.isfinite(ball[:, 0]))
+    for start, stop in mn.runs(labels == "D"):
+        before, after = seen[seen < start], seen[seen >= stop]
+        if not len(before) and not len(after):
+            continue
+        a = ball[before[-1]] if len(before) else ball[after[0]]
+        b = ball[after[0]] if len(after) else a
+        n = stop - start
+        path = mn.carried_ball(n, a * pitch, b * pitch, rng) / pitch
+        blur = min(mn.BALL_SMOOTH_FRAMES, n if n % 2 else n - 1)   # odd, no longer than the stoppage
+        path = mn.jitter(mn.smooth(path, max(blur, 1)), mn.BALL_JITTER_M, rng)
+        ball[start:stop] = path
+    data["ball"] = ball
 
 
 def same_tracking(a, b):
@@ -101,15 +131,17 @@ def main():
                                                 "game 1 / 2 / 3", "macroF1"))
     reference = None
     for name in names:
-        description, change, level = table[name]
+        description, change, level, *edit = table[name]
         for key, value in base.items():
             setattr(mn, key, copy.deepcopy(value))
         for key, value in change.items():
             setattr(mn, key, value)
         spell, macro = [], []
         for test in se.GAMES:
-            data, _ = mn.make_noisy(test, level, SEED)
+            data, labels = mn.make_noisy(test, level, SEED)
             data.pop("ball_reason")
+            if edit:
+                edit[0](data, labels, np.random.default_rng([test, level, SEED, 1]))
             if name == "calibrated" and not same_tracking(data, se.load_tracking(test, LEVEL, SEED)):
                 sys.exit("the calibrated variant doesn't reproduce the stored copy of game {}: "
                          "re-make the noisy copies first".format(test))

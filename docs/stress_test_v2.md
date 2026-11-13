@@ -87,3 +87,88 @@ that loss is information the blurrier tracking doesn't contain.
 | Largest noisy / clean drop | — | −0.018 / −0.028 | −0.022 / −0.006 |
 
 Logged as `results/runs/20261113-101504_touch_dead_v2_seed0.json`.
+
+## Ball shown moving during stoppages (2026-11-13)
+
+**Why:** in the real match, measured as summary numbers only, the ball in stoppages is either
+missing or moving, never still. Our copies show a still ball in part of some stoppages. "Never
+shown" was already tested (+0.003); "shown and moving" wasn't.
+
+**Variant** (`moving_ball_stoppages` / `moving_ball_all_stoppages` in `evaluation/stress_test.py`):
+- Each stoppage's ball is carried at 1–3 m/s (drawn per stoppage) from the last ball seen before
+  it toward the first seen after it, where play restarts.
+- It steers there with some random wandering, then keeps circling near the spot, so it never
+  sits still.
+- It gets the copies' 0.84 s blur and the usual jitter.
+- Either the frames that showed a ball keep showing one (same share, 43% of stoppage frames), or
+  the ball is shown on every stoppage frame.
+- On stoppage frames, the share where the ball moves under 1 m/s falls from 28% to 3–7%.
+
+Current v2 (0.4 s player speeds), live35, seed 0:
+
+| Variant | spellF1 (game 1 / 2 / 3) | macroF1 | Detector D share (true 0.428) | Dead precision / recall |
+|---|---|---|---|---|
+| As calibrated | 0.465 (0.50 / 0.44 / 0.45) | 0.820 | 0.418 | 0.90 / 0.88 |
+| Moving ball, same share | 0.445 (0.48 / 0.42 / 0.44), −0.020 | 0.792 | 0.390 | 0.89 / 0.82 |
+| Moving ball, every stoppage frame | 0.434 (0.47 / 0.41 / 0.42), −0.031 | 0.776 | 0.374 | 0.89 / 0.78 |
+
+**What breaks: `ball_still`.**
+- The detector learned "still ball ⇒ dead": on the copies, `ball_still` is 0.75 on dead frames
+  against 0.04 on live ones, with large positive weights.
+- With a moving ball it drops to 0.06 on dead frames, so the detector misses stoppages: recall
+  falls from 0.88 to 0.78–0.82 while precision stays put.
+- Blanking `ball_still` at predict time (the fitted model treats it as unmeasured):
+
+  | Variant | Full | Without `ball_still` | Without `ball_still` and `ball_out` |
+  |---|---|---|---|
+  | As calibrated | 0.465 | 0.448 | 0.441 |
+  | Moving, same share | 0.445 | 0.443 | 0.435 |
+  | Moving, every frame | 0.434 | 0.445 | 0.437 |
+
+  Without it, the variants score about the same as the calibrated copies (0.443–0.448), so
+  `ball_still` accounts for the loss. `ball_out` matters little.
+
+## On the copies with a carried stoppage ball (2026-11-13)
+
+The copies now carry every stoppage ball shown to the restart at 4–6 m/s, a speed fitted to the
+real touch signal. The stoppage-ball variants were redone to match:
+- **never:** the ball is never shown in stoppages;
+- **more:** a ball is shown in every stoppage, for part of it;
+- **every frame:** a carried ball is shown on every stoppage frame;
+- **still:** the ball lies still, as in the old copies;
+- **slow:** the ball is carried at 1–3 m/s.
+
+Stress table, live35, the model before restart snapping (named v2 then, v3 at 0.460 now):
+
+| Variant | spellF1 (game 1 / 2 / 3) | Change | macroF1 |
+|---|---|---|---|
+| As calibrated | 0.450 (0.50 / 0.41 / 0.44) | — | 0.816 |
+| Track breaks ×2 / ×0.5 | 0.441 / 0.451 | −0.010 / +0.001 | 0.81 |
+| Ball blur ×0.5 / ×1.5 | 0.486 / 0.389 | +0.036 / −0.061 | 0.83 / 0.79 |
+| Random ball gaps ×2 | 0.433 | −0.017 | 0.81 |
+| Ball missing on 65% of live frames | 0.340 | −0.110 | 0.77 |
+| Stoppage ball never / more / every frame | 0.446 / 0.459 / 0.450 | −0.004 / +0.009 / 0.000 | 0.81–0.82 |
+| **Stoppage ball lying still (the old copies)** | **0.414** (0.46 / 0.38 / 0.41) | **−0.037** | **0.657** |
+| Stoppage ball carried slowly (1–3 m/s) | 0.433 | −0.017 | 0.793 |
+| Player wobble 0.1 m | 0.443 | −0.007 | 0.809 |
+| Every high ball lost | 0.470 | +0.019 | 0.819 |
+
+**Dead-ball detector and `ball_still`** (v3 with restart snapping, live35):
+- On the new copies the stoppage ball is never still: `ball_still` is 0.000 on dead frames and
+  0.036 on live ones.
+- So the detector now learns "still ball ⇒ live": the `ball_still` weights are negative
+  (round 1: −0.65, −0.33, 0.03, −0.37, −0.56). Physically that is backwards.
+
+| Copies | spellF1 | D share (true 0.428) | Dead precision / recall | Without `ball_still` |
+|---|---|---|---|---|
+| As calibrated | 0.456 | 0.411 | 0.90 / 0.87 | 0.443 (recall 0.85) |
+| Stoppage ball still | 0.417 | 0.224 | 0.88 / **0.46** | 0.457 (recall 0.85) |
+| Every stoppage frame | 0.450 | 0.422 | 0.90 / 0.89 | 0.434 |
+| Carried slowly | 0.439 | 0.371 | 0.92 / 0.79 | 0.442 |
+
+- Recall on the new copies is back to 0.87, against 0.88 on the old copies.
+- `ball_still` is worth +0.013 on the copies we score on.
+- If the real stoppage ball is ever still, though, it halves recall and the macroF1 drops to
+  0.66.
+- Blanking it at predict time keeps every variant at 0.434–0.457. That is the fitted model with
+  the feature treated as unmeasured, not a refit.
