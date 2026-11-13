@@ -36,6 +36,8 @@ import possession_metrics as pm  # noqa: E402
 
 # Params
 MAX_SPEED = 12.0              # m/s; a player "moving" faster than this is a track swap
+SPEED_STEP_S = 0.4            # measure player movement over this long, so per-frame wobble in
+                              # the tracking cancels out instead of looking like running
 WALK_SPEED = 2.0              # m/s, relative units after normalising (see frame_features)
 SPRINT_SPEED = 3.5
 BALL_STILL_SPEED = 1.0        # m/s
@@ -71,11 +73,20 @@ def rolling_mean(x, before, after):
         return np.where(count > 0, (csum[hi] - csum[lo]) / count, np.nan)
 
 
+def step_rate(x, step_s=SPEED_STEP_S):
+    """Change of x per second, measured from step_s/2 before to step_s/2 after each frame
+    (axis 0). NaN at the ends and wherever either end is missing."""
+    half = max(1, int(round(step_s * FPS / 2)))
+    out = np.full(x.shape, np.nan, dtype=np.float64)
+    out[half:-half] = (x[2 * half:] - x[:-2 * half]) * FPS / (2 * half)
+    return out
+
+
 def player_speeds(players):
-    """(frames, players) speed in m/s; NaN where a track starts, ends or jumps (a swap)."""
-    pos = players * np.array(PITCH, dtype=np.float32)
-    speed = np.full(players.shape[:2], np.nan, dtype=np.float32)
-    speed[1:] = np.hypot(pos[1:, :, 0] - pos[:-1, :, 0], pos[1:, :, 1] - pos[:-1, :, 1]) * FPS
+    """(frames, players) speed in m/s over SPEED_STEP_S; NaN where a track starts, ends or
+    jumps (a swap)."""
+    rate = step_rate(players * np.array(PITCH, dtype=np.float32))
+    speed = np.hypot(rate[..., 0], rate[..., 1])
     speed[speed > MAX_SPEED] = np.nan
     return speed
 
@@ -136,9 +147,7 @@ def shape_movement(players, team):
             p = pos[:, team == side]
             centre = np.nanmean(p, axis=1)
             spread = np.nanmean(np.hypot(*(p - centre[:, None, :]).transpose(2, 0, 1)), axis=1)
-            move = np.full(len(players), np.nan)
-            move[1:] = (np.hypot(*(centre[1:] - centre[:-1]).T)
-                        + np.abs(spread[1:] - spread[:-1])) * FPS
+            move = np.hypot(*step_rate(centre).T) + np.abs(step_rate(spread))
             move[move > MAX_SPEED] = np.nan           # a track dropping in or out, not movement
             total += move
     return total / 2

@@ -1,0 +1,271 @@
+{
+ "model": "touch_dead_v2",
+ "spec": "models.touch_dead:TouchDead",
+ "settings": {
+  "touch": {
+   "min_strength": 2.0,
+   "radius_m": 3.5,
+   "window": 12,
+   "assign": "at",
+   "deflection_s": 0.5,
+   "leave_m": 0.0,
+   "reappear_s": 0.2
+  },
+  "dead": {
+   "windows_s": [
+    2,
+    8,
+    20
+   ],
+   "side_window_s": 6,
+   "l2": 1.0,
+   "max_gap_frames": 150,
+   "carry_radius_m": 2.0,
+   "inputs": [
+    "median_speed",
+    "fast_speed",
+    "walking",
+    "sprinting",
+    "shape_moving",
+    "gathered",
+    "at_touchline",
+    "ball_out",
+    "ball_still"
+   ],
+   "post": {
+    "threshold": 0.45,
+    "min_dead_s": 4,
+    "min_live_s": 4
+   },
+   "post_grid": {
+    "threshold": [
+     0.35,
+     0.45,
+     0.55,
+     0.65
+    ],
+    "min_dead_s": [
+     2,
+     4,
+     8,
+     12
+    ],
+    "min_live_s": [
+     2,
+     4,
+     8,
+     12
+    ]
+   }
+  },
+  "restart_from_next_touch": true
+ },
+ "seed": 0,
+ "who": "agentB",
+ "note": "robustness fix: dead-ball player movement measured over 0.4 s",
+ "time": "2026-11-12T13:17:25",
+ "branch": "jordan/dead-ball",
+ "commit": "42c04d4b457df2f7d34145693dd52e731dd8dfc8",
+ "dirty": false,
+ "headline": 0.47239728402488806,
+ "per_game": {
+  "1": 0.5039478110938223,
+  "2": 0.4631097698810977,
+  "3": 0.45013427109974424
+ },
+ "cells": {
+  "1": {
+   "reception": {
+    "20": {
+     "spell_f1": 0.508227848101266,
+     "macro_f1": 0.8475415072724287,
+     "n_gt_spells": 317,
+     "n_pred_spells": 315,
+     "spell_f1_range": [
+      0.4681645569620253,
+      0.5512974683544304
+     ]
+    },
+    "35": {
+     "spell_f1": 0.49966777408637864,
+     "macro_f1": 0.827753157828662,
+     "n_gt_spells": 317,
+     "n_pred_spells": 285,
+     "spell_f1_range": [
+      0.4558139534883721,
+      0.5375747508305647
+     ]
+    },
+    "50": {
+     "spell_f1": 0.38694158075601376,
+     "macro_f1": 0.7927511840198713,
+     "n_gt_spells": 317,
+     "n_pred_spells": 265
+    },
+    "clean": {
+     "spell_f1": 0.7213114754098361,
+     "macro_f1": 0.8770306171982711,
+     "n_gt_spells": 317,
+     "n_pred_spells": 293
+    }
+   },
+   "kick": {
+    "20": {
+     "spell_f1": 0.5067484662576687,
+     "macro_f1": 0.8508302107866897,
+     "n_gt_spells": 337,
+     "n_pred_spells": 315
+    },
+    "35": {
+     "spell_f1": 0.4971061093247588,
+     "macro_f1": 0.8329791708389017,
+     "n_gt_spells": 337,
+     "n_pred_spells": 285
+    },
+    "50": {
+     "spell_f1": 0.3966777408637874,
+     "macro_f1": 0.7990621085655919,
+     "n_gt_spells": 337,
+     "n_pred_spells": 265
+    },
+    "clean": {
+     "spell_f1": 0.7250793650793651,
+     "macro_f1": 0.8906003223621304,
+     "n_gt_spells": 337,
+     "n_pred_spells": 293
+    }
+   }
+  },
+  "2": {
+   "reception": {
+    "20": {
+     "spell_f1": 0.4858085808580858,
+     "macro_f1": 0.8364644606175186,
+     "n_gt_spells": 288,
+     "n_pred_spells": 318,
+     "spell_f1_range": [
+      0.44207920792079203,
+      0.5306930693069306
+     ]
+    },
+    "35": {
+     "spell_f1": 0.4404109589041096,
+     "macro_f1": 0.827131233257659,
+     "n_gt_spells": 288,
+     "n_pred_spells": 296,
+     "spell_f1_range": [
+      0.40119863013698626,
+      0.4829452054794521
+     ]
+    },
+    "50": {
+     "spell_f1": 0.3992233009708738,
+     "macro_f1": 0.804784716687557,
+     "n_gt_spells": 288,
+     "n_pred_spells": 227
+    },
+    "clean": {
+     "spell_f1": 0.7446043165467626,
+     "macro_f1": 0.8986381639118607,
+     "n_gt_spells": 288,
+     "n_pred_spells": 268
+    }
+   },
+   "kick": {
+    "20": {
+     "spell_f1": 0.47424,
+     "macro_f1": 0.8334416119624275,
+     "n_gt_spells": 307,
+     "n_pred_spells": 318
+    },
+    "35": {
+     "spell_f1": 0.4391376451077944,
+     "macro_f1": 0.8249232139802073,
+     "n_gt_spells": 307,
+     "n_pred_spells": 296
+    },
+    "50": {
+     "spell_f1": 0.4059925093632959,
+     "macro_f1": 0.8061511471203412,
+     "n_gt_spells": 307,
+     "n_pred_spells": 227
+    },
+    "clean": {
+     "spell_f1": 0.7443478260869565,
+     "macro_f1": 0.9017095029852012,
+     "n_gt_spells": 307,
+     "n_pred_spells": 268
+    }
+   }
+  },
+  "3": {
+   "reception": {
+    "20": {
+     "spell_f1": 0.44673913043478264,
+     "macro_f1": 0.8320847231816287,
+     "n_gt_spells": 364,
+     "n_pred_spells": 372,
+     "spell_f1_range": [
+      0.4086684782608696,
+      0.48320652173913037
+     ]
+    },
+    "35": {
+     "spell_f1": 0.45352941176470585,
+     "macro_f1": 0.8036587531141728,
+     "n_gt_spells": 364,
+     "n_pred_spells": 316,
+     "spell_f1_range": [
+      0.41035294117647053,
+      0.49591176470588244
+     ]
+    },
+    "50": {
+     "spell_f1": 0.4229813664596273,
+     "macro_f1": 0.7913028058291491,
+     "n_gt_spells": 364,
+     "n_pred_spells": 280
+    },
+    "clean": {
+     "spell_f1": 0.7320417287630403,
+     "macro_f1": 0.8817740529704278,
+     "n_gt_spells": 364,
+     "n_pred_spells": 307
+    }
+   },
+   "kick": {
+    "20": {
+     "spell_f1": 0.45212765957446804,
+     "macro_f1": 0.8307061353231676,
+     "n_gt_spells": 380,
+     "n_pred_spells": 372
+    },
+    "35": {
+     "spell_f1": 0.4580459770114942,
+     "macro_f1": 0.8022166103864224,
+     "n_gt_spells": 380,
+     "n_pred_spells": 316
+    },
+    "50": {
+     "spell_f1": 0.4296969696969697,
+     "macro_f1": 0.7904992591476664,
+     "n_gt_spells": 380,
+     "n_pred_spells": 280
+    },
+    "clean": {
+     "spell_f1": 0.733042212518195,
+     "macro_f1": 0.8840020790349694,
+     "n_gt_spells": 380,
+     "n_pred_spells": 307
+    }
+   }
+  }
+ },
+ "keep_rule": {
+  "against": "20261112-122051_touch_dead_v2_seed0.json",
+  "against_model": "touch_dead_v2",
+  "headline_gain": -0.0069,
+  "drops_over_limit": {},
+  "keep": false
+ }
+}
