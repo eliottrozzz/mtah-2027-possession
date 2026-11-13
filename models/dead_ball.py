@@ -41,6 +41,9 @@ SPEED_STEP_S = 0.4            # measure player movement over this long, so per-f
 WALK_SPEED = 2.0              # m/s, relative units after normalising (see frame_features)
 SPRINT_SPEED = 3.5
 BALL_STILL_SPEED = 1.0        # m/s
+STILL_STRETCH_S = 2.0         # a ball still (over SPEED_STEP_S) this long is waiting for a restart
+OUT_RECENT_S = 20.0           # "went out": the ball was seen off the pitch within this long before
+BOUNDARY_M = 2.0              # or it lies this close to a line (corner, throw-in, goal kick spot)
 GROUP_RADIUS_M = 4.0          # players this close together count as one group (a wall, a corner)
 TOUCHLINE_M = 1.0             # a player within this of a touchline, or beyond it, is "at" it
 STANDING_SPEED = 1.0          # m/s
@@ -126,6 +129,7 @@ def frame_features(tracking):
     off = (ball[:, 0] < 0) | (ball[:, 0] > 1) | (ball[:, 1] < 0) | (ball[:, 1] > 1)
     ball_out = np.where(seen, off, np.nan)
     ball_still = np.where(np.isfinite(bspeed), bspeed < BALL_STILL_SPEED, np.nan)
+    still_stretch, out_then_still = waiting_ball(ball)
 
     return {"median_speed": per_half_scale(median, period),
             "fast_speed": per_half_scale(fast, period),
@@ -133,7 +137,35 @@ def frame_features(tracking):
             "shape_moving": per_half_scale(shape_movement(players, tracking["team"]), period),
             "gathered": largest_group(players),
             "at_touchline": standing_at_touchline(players, speed),
-            "ball_out": ball_out, "ball_still": ball_still}
+            "ball_out": ball_out, "ball_still": ball_still,
+            "still_stretch": still_stretch, "out_then_still": out_then_still}
+
+
+def waiting_ball(ball):
+    """Two per-frame signals of a ball waiting for a restart (NaN where it can't be measured):
+
+        still_stretch   the ball is part of a stretch at least STILL_STRETCH_S long in which it
+                        moves under BALL_STILL_SPEED (measured over SPEED_STEP_S): placed for a
+                        free kick, corner or throw-in
+        out_then_still  the same, and the ball went out within OUT_RECENT_S before, or lies
+                        within BOUNDARY_M of a line: corners, throw-ins, goal kicks
+    """
+    pos = ball * np.array(PITCH, dtype=np.float32)
+    speed = np.hypot(*step_rate(pos).T)
+    measured = np.isfinite(speed)
+    still = np.zeros(len(ball), dtype=bool)
+    for start, end in runs(measured & (speed < BALL_STILL_SPEED)):
+        if end - start >= STILL_STRETCH_S * FPS:
+            still[start:end] = True
+    seen = np.isfinite(ball[:, 0])
+    off = seen & ((ball[:, 0] < 0) | (ball[:, 0] > 1) | (ball[:, 1] < 0) | (ball[:, 1] > 1))
+    went_out = rolling_mean(off.astype(np.float64), int(OUT_RECENT_S * FPS), 0) > 0
+    with np.errstate(invalid="ignore"):
+        to_line = np.minimum(np.minimum(pos[:, 0], PITCH[0] - pos[:, 0]),
+                             np.minimum(pos[:, 1], PITCH[1] - pos[:, 1]))
+    at_line = to_line < BOUNDARY_M
+    return (np.where(measured, still, np.nan),
+            np.where(measured, still & (went_out | at_line), np.nan))
 
 
 def shape_movement(players, team):
@@ -387,4 +419,4 @@ class DeadBallB:
 
 def frame_features_names():
     return ("median_speed", "fast_speed", "walking", "sprinting", "shape_moving", "gathered",
-            "at_touchline", "ball_out", "ball_still")
+            "at_touchline", "ball_out", "ball_still", "still_stretch", "out_then_still")
