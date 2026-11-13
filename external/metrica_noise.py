@@ -72,7 +72,20 @@ NEAR_GOAL = 0.17               # as in measure_ball_gaps.py
 NEAR_TOUCHLINE = 0.10
 
 # Ball during stoppages.
-DEAD_VISIBLE_PROB = 0.5        # chance a stoppage shows a still ball for part of it
+DEAD_VISIBLE_PROB = 0.5        # chance a stoppage shows a ball for part of it
+# Where a ball is shown in a stoppage it is being carried to the restart, not lying still. The
+# provided tracking's touch signal at 0.32 s and 0.48 s windows (median about 2.5 m/s at 0.48 s)
+# matches our live play alone, so its stoppage ball is moving or missing, not still; a still ball
+# made the copies' median half the real one (checked 2026-11-13, summary numbers only). Speed and
+# steering follow Track B's stress test; CARRY_SPEED_MS is fitted with --fit-stoppages.
+# Fitted 2026-11-13 (miss over the 15 percentiles): 0.5-1.5 m/s 3.70, 1-3 2.46, 2-4 2.08, 3-5 1.59,
+# 4-6 1.41, 5-7 1.67, 2-6 1.52; the still ball it replaces scored about 2.4. A ball rolled or passed
+# back to the restart. Trade-off: the 4-frame p99 rises to about 7.7 m/s (real 5.9).
+CARRY_SPEED_MS = (4.0, 6.0)    # drawn per stoppage
+CARRY_SPEED_CANDIDATES = ((0.5, 1.5), (1.0, 3.0), (2.0, 4.0), (3.0, 5.0), (4.0, 6.0), (5.0, 7.0),
+                          (2.0, 6.0))
+CARRY_TURN_PER_S = 1.0         # how fast it steers toward the restart spot
+CARRY_WANDER = 1.0             # random turning, radians per sqrt(second)
 
 # Jitter, metres: independent wobble on every frame.
 BALL_JITTER_M = 0.3
@@ -303,6 +316,40 @@ def show_ball_in_stoppages(ball, labels, rng):
     return out
 
 
+def carried_ball(n, start, target, rng):
+    """(n, 2) path in metres: carried from start toward target at a walking or jogging pace,
+    steering with some random wandering, then circling near the spot so it never sits still."""
+    speed = rng.uniform(*CARRY_SPEED_MS)
+    pos, path = np.array(start, dtype=np.float64), np.empty((n, 2))
+    heading = np.arctan2(*(target - pos)[::-1]) + rng.normal(0.0, 0.5)
+    for i in range(n):
+        wanted = np.arctan2(*(target - pos)[::-1])
+        turn = (wanted - heading + np.pi) % (2 * np.pi) - np.pi
+        heading += CARRY_TURN_PER_S * turn / FPS + rng.normal(0.0, CARRY_WANDER / np.sqrt(FPS))
+        pos = pos + speed / FPS * np.array([np.cos(heading), np.sin(heading)])
+        path[i] = pos
+    return path
+
+
+def carry_dead_ball(ball, labels, rng):
+    """Replace every ball shown in a stoppage with one carried from the last ball seen before it
+    to the first seen after it (where play restarts), blurred like the rest of the ball."""
+    out, pitch = ball.copy(), np.array(mt.PITCH, dtype=np.float64)
+    seen = np.flatnonzero(np.isfinite(ball[:, 0]))
+    for start, stop in runs(labels == "D"):
+        shown = np.isfinite(ball[start:stop, 0])
+        if not shown.any():
+            continue
+        before, after = seen[seen < start], seen[seen >= stop]
+        a = ball[before[-1]] if len(before) else ball[start + np.argmax(shown)]
+        b = ball[after[0]] if len(after) else a
+        n = stop - start
+        path = carried_ball(n, a * pitch, b * pitch, rng)
+        blur = min(BALL_SMOOTH_FRAMES, n if n % 2 else n - 1)
+        out[start:stop][shown] = (smooth(path, max(blur, 1)) / pitch)[shown]
+    return out.astype(np.float32)
+
+
 def break_tracks(game, rng):
     """Cut every player's track into pieces and deal the pieces into anonymous team slots."""
     players = game["players"]
@@ -364,7 +411,8 @@ def make_noisy(game_no, level, seed):
     reason[seen & air] = 2                             # 2 ball in the air
     ball[reason > 1] = np.nan
     ball = show_ball_in_stoppages(ball, labels, rng)
-    reason[(reason == 1) & ~np.isnan(ball[:, 0])] = 4  # 4 still ball shown in a stoppage
+    reason[(reason == 1) & ~np.isnan(ball[:, 0])] = 4  # 4 ball shown in a stoppage, put back
+    ball = carry_dead_ball(ball, labels, rng)          # every stoppage ball shown is carried
     ball = jitter(ball, BALL_JITTER_M, rng)
 
     players, teams = break_tracks(game, rng)
@@ -389,18 +437,55 @@ def describe(game_no, level, seed, data, labels):
               objects[graded].mean()))
 
 
+def fit_stoppage_ball(stats):
+    """Print, for each CARRY_SPEED_CANDIDATES range, how well the finished copies' touch signal
+    at windows 4, 8 and 12 matches the real one (summed |log ratio| over the percentiles), using
+    live20/35 seed-0 copies of all three games built in memory. Writes nothing."""
+    from models.touch import touch_strength
+    keys = {4: "touch_strength_quantiles", 8: "touch_strength_quantiles_w8",
+            12: "touch_strength_quantiles_w12"}
+    qs = sorted(QUANTILE_KEYS, key=float)
+    goal = {w: np.array([stats[k][q] for q in qs]) for w, k in keys.items() if k in stats}
+    global CARRY_SPEED_MS
+    keep, results = CARRY_SPEED_MS, []
+    for speeds in CARRY_SPEED_CANDIDATES:
+        CARRY_SPEED_MS = speeds
+        got = {w: [] for w in goal}
+        for game_no in (1, 2, 3):
+            for level in (20, 35):
+                data, _ = make_noisy(game_no, level, 0)
+                for w in goal:
+                    st = touch_strength(data["ball"], w)
+                    st = st[(data["period"] > 0) & np.isfinite(st)]
+                    got[w].append(np.percentile(st, [float(q) for q in qs]))
+        got = {w: np.mean(v, axis=0) for w, v in got.items()}
+        err = sum(np.abs(np.log(np.maximum(got[w], 1e-3) / goal[w])).sum() for w in goal)
+        results.append((err, speeds))
+        print("carry {}-{} m/s: miss {:.2f}   ".format(*speeds, err) + "  ".join(
+            "w{} {}".format(w, np.round(got[w], 1).tolist()) for w in goal))
+    CARRY_SPEED_MS = keep
+    print("real: " + "  ".join("w{} {}".format(w, np.round(goal[w], 1).tolist()) for w in goal))
+    print("best:", min(results)[1])
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__.split("\n")[0])
     parser.add_argument("--games", type=int, nargs="+", default=[1, 2, 3], choices=(1, 2, 3))
     parser.add_argument("--levels", type=int, nargs="+", default=list(LEVELS))
     parser.add_argument("--seeds", type=int, nargs="+", default=list(SEEDS))
     parser.add_argument("--calibration", help="ball_gap_stats.json from measure_ball_gaps.py")
+    parser.add_argument("--fit-stoppages", action="store_true",
+                        help="print how well each carry speed matches the real touch signal "
+                             "(needs --calibration); writes nothing")
     args = parser.parse_args()
 
     if args.calibration:
         stats = calibrate(args.calibration)
         print("calibrated on {}: real match missing {:.0%} of graded frames".format(
             stats["game"], stats["ball_missing_rate"]))
+        if args.fit_stoppages:
+            fit_stoppage_ball(stats)
+            return
     os.makedirs(OUT_DIR, exist_ok=True)
     for game_no in args.games:
         for level in args.levels:
