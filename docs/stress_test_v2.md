@@ -87,3 +87,43 @@ that loss is information the blurrier tracking doesn't contain.
 | Largest noisy / clean drop | — | −0.018 / −0.028 | −0.022 / −0.006 |
 
 Logged as `results/runs/20261113-101504_touch_dead_v2_seed0.json`.
+
+## Ball shown moving during stoppages (2026-11-13)
+
+**Why:** in the real match, measured as summary numbers only, the ball in stoppages is either
+missing or moving, never still. Our copies show a still ball in part of some stoppages. "Never
+shown" was already tested (+0.003); "shown and moving" wasn't.
+
+**Variant** (`moving_ball_stoppages` / `moving_ball_all_stoppages` in `evaluation/stress_test.py`):
+- Each stoppage's ball is carried at 1–3 m/s (drawn per stoppage) from the last ball seen before
+  it toward the first seen after it, where play restarts.
+- It steers there with some random wandering, then keeps circling near the spot, so it never
+  sits still.
+- It gets the copies' 0.84 s blur and the usual jitter.
+- Either the frames that showed a ball keep showing one (same share, 43% of stoppage frames), or
+  the ball is shown on every stoppage frame.
+- On stoppage frames, the share where the ball moves under 1 m/s falls from 28% to 3–7%.
+
+Current v2 (0.4 s player speeds), live35, seed 0:
+
+| Variant | spellF1 (game 1 / 2 / 3) | macroF1 | Detector D share (true 0.428) | Dead precision / recall |
+|---|---|---|---|---|
+| As calibrated | 0.465 (0.50 / 0.44 / 0.45) | 0.820 | 0.418 | 0.90 / 0.88 |
+| Moving ball, same share | 0.445 (0.48 / 0.42 / 0.44), −0.020 | 0.792 | 0.390 | 0.89 / 0.82 |
+| Moving ball, every stoppage frame | 0.434 (0.47 / 0.41 / 0.42), −0.031 | 0.776 | 0.374 | 0.89 / 0.78 |
+
+**What breaks: `ball_still`.**
+- The detector learned "still ball ⇒ dead": on the copies, `ball_still` is 0.75 on dead frames
+  against 0.04 on live ones, with large positive weights.
+- With a moving ball it drops to 0.06 on dead frames, so the detector misses stoppages: recall
+  falls from 0.88 to 0.78–0.82 while precision stays put.
+- Blanking `ball_still` at predict time (the fitted model treats it as unmeasured):
+
+  | Variant | Full | Without `ball_still` | Without `ball_still` and `ball_out` |
+  |---|---|---|---|
+  | As calibrated | 0.465 | 0.448 | 0.441 |
+  | Moving, same share | 0.445 | 0.443 | 0.435 |
+  | Moving, every frame | 0.434 | 0.445 | 0.437 |
+
+  Without it, the variants score about the same as the calibrated copies (0.443–0.448), so
+  `ball_still` accounts for the loss. `ball_out` matters little.
