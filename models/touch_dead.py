@@ -26,6 +26,7 @@ import sys
 import numpy as np
 
 from models.dead_ball import DeadBallDetector
+from models.team_shape import TeamShapePrior
 from models.touch import FPS, LastTouch, all_touches
 
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
@@ -128,3 +129,61 @@ class TouchDeadCarry(TouchDead):
     """The same, but the team before a stoppage carries over to after it (for comparison)."""
     name = "touch_dead_v3_carry"
     restart_from_next_touch = False
+
+
+# Team-shape override (Track D, 2026-11-13). The team-shape prior (models/team_shape.py) reads
+# who has the ball from the players alone. Where it is very sure and disagrees with the touches
+# for long enough, it wins: a touch given to the wrong player in a crowd, or a switch hidden in a
+# ball gap. "off" stays in the grid, so fit() can turn it off.
+OVERRIDE_GRID = [{"sure": None}] + [{"sure": s, "min_s": m}
+                                    for s in (0.3, 0.35, 0.4, 0.45) for m in (0.5, 1.0, 2.0, 4.0)]
+
+
+def shape_override(labels, p_home, params):
+    """labels with live frames switched to the prior's team where it is more than 0.5 + sure
+    confident, disagrees, and does so for at least min_s in a row. D frames are never touched."""
+    if params["sure"] is None:
+        return labels
+    labels = labels.copy()
+    prior = np.where(p_home > 0.5, "H", "A")
+    flip = (np.isin(labels, ["H", "A"]) & (prior != labels)
+            & (np.abs(p_home - 0.5) > params["sure"]))
+    for start, stop in runs(flip):
+        if stop - start >= params["min_s"] * FPS:
+            labels[start:stop] = prior[start:stop]
+    return labels
+
+
+class TouchDeadShape(TouchDead):
+    """v3 plus the team-shape override."""
+    name = "touch_dead_v3_shape"
+
+    def __init__(self):
+        super().__init__()
+        self.prior = TeamShapePrior()
+        self.override = {"sure": None}
+
+    def settings(self):
+        return dict(super().settings(), shape=self.prior.settings(), override=dict(self.override))
+
+    def fit(self, train):
+        super().fit(train)
+        self.prior.fit(train)
+        # Tuned last, on top of everything else; the expensive parts run once.
+        parts = [(self.predict_v3(tr), self.prior.predict_proba(tr), gt) for tr, gt in train]
+        best, best_score = None, -1.0
+        for params in OVERRIDE_GRID:
+            score = float(np.mean([
+                pm.evaluate(gt, pm.label_codes(shape_override(lab, p, params)))["spell_f1_mean"]
+                for lab, p, gt in parts]))
+            if score > best_score:
+                best, best_score = params, score
+        self.override = best
+        print("    override: {} (train spellF1 {:.3f})".format(best, best_score))
+
+    def predict_v3(self, tracking):
+        return super().predict(tracking)
+
+    def predict(self, tracking):
+        return shape_override(self.predict_v3(tracking), self.prior.predict_proba(tracking),
+                              self.override)
