@@ -68,6 +68,8 @@ TUNING_LEVELS = (20, 35)
 STRESS_LEVELS = (50,)
 INFO_LEVELS = ("clean",)              # shown, never part of the keep rule
 MAX_DROP = 0.02                       # largest drop allowed on any single result
+CLEAN_MAX_DROP = 0.05                 # ... and on any clean result: a change that only helps the
+                                      # noisy copies may be fitting our noise model, not football
 BOOTSTRAP_N = 200                     # for the headline cells only
 RUNS_DIR = os.path.join(ROOT, "results", "runs")
 LABEL_PATH = os.path.join(mt.OUT_DIR, "game{}_labels_{}.csv")
@@ -294,10 +296,21 @@ def keep_rule(cells, seed):
     mine = checked_results(cells)
     drops = {"game{} {} live{}".format(*k): round(best_cells[k] - mine[k], 4)
              for k in mine if k in best_cells and best_cells[k] - mine[k] > MAX_DROP}
+    best_clean, mine_clean = clean_results(cells_from_log(best)), clean_results(cells)
+    clean_drops = {"game{} {} clean".format(*k): round(best_clean[k] - mine_clean[k], 4)
+                   for k in mine_clean
+                   if k in best_clean and best_clean[k] - mine_clean[k] > CLEAN_MAX_DROP}
+    drops.update(clean_drops)
     gain = headline(cells)[0] - best["headline"]
     return {"against": best["_file"], "against_model": best["model"],
             "headline_gain": round(gain, 4), "drops_over_limit": drops,
             "keep": gain > 0 and not drops}
+
+
+def clean_results(cells):
+    """{(game, key): spellF1} on the clean copies."""
+    return {(g, k): cells[g][k]["clean"]["spell_f1"] for g in cells for k in cells[g]
+            if "clean" in cells[g][k]}
 
 
 def show(entry):
@@ -321,8 +334,8 @@ def show(entry):
     rule = entry.get("keep_rule")
     if rule:
         verdict = "KEEP" if rule["keep"] else "DON'T KEEP"
-        print("against best so far ({}): headline {:+.3f}, drops over {}: {} -> {}".format(
-            rule["against_model"], rule["headline_gain"], MAX_DROP,
+        print("against best so far ({}): headline {:+.3f}, drops over {} ({} clean): {} -> {}"
+              .format(rule["against_model"], rule["headline_gain"], MAX_DROP, CLEAN_MAX_DROP,
             rule["drops_over_limit"] or "none", verdict))
     elif entry["seed"] == "sealed":
         print("sealed milestone: no keep rule, and nothing gets tweaked in response")

@@ -1,0 +1,295 @@
+{
+ "model": "touch_dead_v3_shape_unseen",
+ "spec": "models.touch_dead:TouchDeadShapeUnseen",
+ "settings": {
+  "touch": {
+   "min_strength": 1.0,
+   "min_strength_rel": null,
+   "radius_m": 2.5,
+   "window": 12,
+   "assign": "at",
+   "deflection_s": 0.5,
+   "reappear_s": 0.2,
+   "leave_m": 0.0,
+   "gap_rule": "advance",
+   "gap_min_s": 2.0,
+   "gap_shift_s": 2.0
+  },
+  "dead": {
+   "windows_s": [
+    2,
+    8,
+    20
+   ],
+   "side_window_s": 6,
+   "l2": 1.0,
+   "max_gap_frames": 150,
+   "carry_radius_m": 2.0,
+   "inputs": [
+    "median_speed",
+    "fast_speed",
+    "walking",
+    "sprinting",
+    "shape_moving",
+    "gathered",
+    "at_touchline",
+    "ball_out",
+    "ball_still",
+    "still_stretch",
+    "out_then_still"
+   ],
+   "post": {
+    "threshold": 0.55,
+    "min_dead_s": 4,
+    "min_live_s": 2
+   },
+   "post_grid": {
+    "threshold": [
+     0.35,
+     0.45,
+     0.55,
+     0.65
+    ],
+    "min_dead_s": [
+     2,
+     4,
+     8,
+     12
+    ],
+    "min_live_s": [
+     2,
+     4,
+     8,
+     12
+    ]
+   }
+  },
+  "restart_from_next_touch": true,
+  "snap": {
+   "snap": "first",
+   "snap_s": 1.0
+  },
+  "shape": {
+   "windows_s": [
+    1,
+    4,
+    12
+   ],
+   "side_window_s": 6,
+   "forward_step_s": 1.0,
+   "signals": [
+    "spread_x",
+    "spread_y",
+    "depth",
+    "forward"
+   ]
+  },
+  "override": {
+   "sure": 0.3,
+   "min_s": 2.0
+  },
+  "only_unseen": true
+ },
+ "seed": 1,
+ "who": "agentD",
+ "note": "milestone: v3 + team-shape override where the ball is unseen",
+ "time": "2026-11-13T20:04:10",
+ "branch": "jordan/ideas",
+ "commit": "2189653ee21fac3836681bcb87ac2aa1a6812fde",
+ "dirty": false,
+ "headline": 0.48798307199898794,
+ "per_game": {
+  "1": 0.5198411107398746,
+  "2": 0.4797653035218789,
+  "3": 0.46434280173521036
+ },
+ "cells": {
+  "1": {
+   "reception": {
+    "20": {
+     "spell_f1": 0.5284627092846271,
+     "macro_f1": 0.8455750360551134,
+     "n_gt_spells": 317,
+     "n_pred_spells": 340,
+     "spell_f1_range": [
+      0.4857534246575343,
+      0.5631963470319633
+     ]
+    },
+    "35": {
+     "spell_f1": 0.511219512195122,
+     "macro_f1": 0.8411318054531746,
+     "n_gt_spells": 317,
+     "n_pred_spells": 298,
+     "spell_f1_range": [
+      0.4643902439024391,
+      0.5469918699186992
+     ]
+    },
+    "50": {
+     "spell_f1": 0.5149501661129567,
+     "macro_f1": 0.8484068546884412,
+     "n_gt_spells": 317,
+     "n_pred_spells": 285
+    },
+    "clean": {
+     "spell_f1": 0.667785234899329,
+     "macro_f1": 0.8617559469447805,
+     "n_gt_spells": 317,
+     "n_pred_spells": 279
+    }
+   },
+   "kick": {
+    "20": {
+     "spell_f1": 0.5163958641063514,
+     "macro_f1": 0.8377941876479982,
+     "n_gt_spells": 337,
+     "n_pred_spells": 340
+    },
+    "35": {
+     "spell_f1": 0.49700787401574803,
+     "macro_f1": 0.8349061186522547,
+     "n_gt_spells": 337,
+     "n_pred_spells": 298
+    },
+    "50": {
+     "spell_f1": 0.49774919614147917,
+     "macro_f1": 0.8421553959413398,
+     "n_gt_spells": 337,
+     "n_pred_spells": 285
+    },
+    "clean": {
+     "spell_f1": 0.688961038961039,
+     "macro_f1": 0.8785943700911135,
+     "n_gt_spells": 337,
+     "n_pred_spells": 279
+    }
+   }
+  },
+  "2": {
+   "reception": {
+    "20": {
+     "spell_f1": 0.4621035058430718,
+     "macro_f1": 0.8448217883776485,
+     "n_gt_spells": 288,
+     "n_pred_spells": 311,
+     "spell_f1_range": [
+      0.42804674457429054,
+      0.5037395659432387
+     ]
+    },
+    "35": {
+     "spell_f1": 0.497427101200686,
+     "macro_f1": 0.8496268677767711,
+     "n_gt_spells": 288,
+     "n_pred_spells": 295,
+     "spell_f1_range": [
+      0.45557461406518013,
+      0.5385934819897085
+     ]
+    },
+    "50": {
+     "spell_f1": 0.42587412587412593,
+     "macro_f1": 0.8294596387069305,
+     "n_gt_spells": 288,
+     "n_pred_spells": 284
+    },
+    "clean": {
+     "spell_f1": 0.6951526032315979,
+     "macro_f1": 0.8754752201782708,
+     "n_gt_spells": 288,
+     "n_pred_spells": 269
+    }
+   },
+   "kick": {
+    "20": {
+     "spell_f1": 0.4446601941747573,
+     "macro_f1": 0.8326278408615786,
+     "n_gt_spells": 307,
+     "n_pred_spells": 311
+    },
+    "35": {
+     "spell_f1": 0.4724252491694353,
+     "macro_f1": 0.836175463019669,
+     "n_gt_spells": 307,
+     "n_pred_spells": 295
+    },
+    "50": {
+     "spell_f1": 0.4074450084602369,
+     "macro_f1": 0.8202519447592254,
+     "n_gt_spells": 307,
+     "n_pred_spells": 284
+    },
+    "clean": {
+     "spell_f1": 0.6958333333333335,
+     "macro_f1": 0.8796829898107669,
+     "n_gt_spells": 307,
+     "n_pred_spells": 269
+    }
+   }
+  },
+  "3": {
+   "reception": {
+    "20": {
+     "spell_f1": 0.4798920377867747,
+     "macro_f1": 0.8496139355642861,
+     "n_gt_spells": 364,
+     "n_pred_spells": 377,
+     "spell_f1_range": [
+      0.44261808367071526,
+      0.5178137651821862
+     ]
+    },
+    "35": {
+     "spell_f1": 0.4487935656836461,
+     "macro_f1": 0.8443476614154258,
+     "n_gt_spells": 364,
+     "n_pred_spells": 382,
+     "spell_f1_range": [
+      0.4068096514745309,
+      0.48152815013404826
+     ]
+    },
+    "50": {
+     "spell_f1": 0.45573294629898403,
+     "macro_f1": 0.8426599015105918,
+     "n_gt_spells": 364,
+     "n_pred_spells": 325
+    },
+    "clean": {
+     "spell_f1": 0.6972262773722628,
+     "macro_f1": 0.8670132756317382,
+     "n_gt_spells": 364,
+     "n_pred_spells": 321
+    }
+   },
+   "kick": {
+    "20": {
+     "spell_f1": 0.4607661822985468,
+     "macro_f1": 0.8381327325692961,
+     "n_gt_spells": 380,
+     "n_pred_spells": 377
+    },
+    "35": {
+     "spell_f1": 0.4299212598425197,
+     "macro_f1": 0.8306627454416761,
+     "n_gt_spells": 380,
+     "n_pred_spells": 382
+    },
+    "50": {
+     "spell_f1": 0.44141843971631206,
+     "macro_f1": 0.8305792577646711,
+     "n_gt_spells": 380,
+     "n_pred_spells": 325
+    },
+    "clean": {
+     "spell_f1": 0.7069900142653351,
+     "macro_f1": 0.8721866832129499,
+     "n_gt_spells": 380,
+     "n_pred_spells": 321
+    }
+   }
+  }
+ },
+ "keep_rule": null
+}

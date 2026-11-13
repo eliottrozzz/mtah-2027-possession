@@ -32,17 +32,20 @@ from games import GAME, half_video_blocks, require, source_frames  # noqa: E402
 import score_external as se  # noqa: E402
 
 # Params
-DEFAULT_MODEL = "models.touch_dead:TouchDead"
+DEFAULT_MODEL = "models.touch_dead:TouchDeadShapeUnseen"  # v3 + team shapes where the ball is unseen (0.491)
 DEFAULT_OUT = os.path.join(ROOT, "evaluation", "results", "submission.csv")
 FIT_LEVELS = se.TUNING_LEVELS
 FIT_SEED = 0
 FPS = 25
+MIN_BALL_SEEN = 0.2      # stop if the ball is seen on fewer graded frames: the frames didn't map
+MIN_PLAYERS_SEEN = 0.9   # ... or if fewer graded frames have any player tracked
 
 
 # -- reading EPTS tracking (the provided ATD, and Metrica game 3, use the same format) -----------
 
-def read_epts(meta_path, raw_path, n_frames, frame_shift):
-    """{ball, players, team, player} from a FIFA/EPTS pair. Row = frame_id - frame_shift.
+def read_epts(meta_path, raw_path, n_frames, to_row):
+    """{ball, players, team, player} from a FIFA/EPTS pair. Row = to_row(frame_id); lines where
+    it returns None or a row outside 0..n_frames-1 are skipped.
 
     Home ('H') is the first <Team> in the metadata. If the metadata gives per-frame-range channel
     layouts (DataFormatSpecification), they are followed; otherwise the columns are taken in the
@@ -81,8 +84,8 @@ def read_epts(meta_path, raw_path, n_frames, frame_shift):
             if len(parts) != 3:
                 continue
             frame_id = int(parts[0])
-            row = frame_id - frame_shift
-            if not 0 <= row < n_frames:
+            row = to_row(frame_id)
+            if row is None or not 0 <= row < n_frames:
                 continue
             while layout_index < len(layouts) - 1 and frame_id > layouts[layout_index][1]:
                 layout_index += 1
@@ -103,7 +106,10 @@ def read_match(game=GAME, data_dir=None):
     """The provided match's tracking, one row per video frame, in the shared format."""
     meta_path, raw_path = require(["atd_meta", "atd_raw"], game, data_dir)
     n = source_frames("tactical", game)
-    tracking = read_epts(meta_path, raw_path, n, frame_shift=1)   # video frame = frame_id - 1
+    # The tactical ATD is already on the video's timeline, one record per video frame numbered
+    # from 1 (starter/load_atd.py checks this), so video frame = frame_id - 1. The IdFrame
+    # offsets in games.py are for other files, not this one.
+    tracking = read_epts(meta_path, raw_path, n, lambda frame_id: frame_id - 1)
     period = np.zeros(n, dtype=np.int8)
     for half, first, last in half_video_blocks(game):
         period[first:last + 1] = half
@@ -152,6 +158,14 @@ def main():
         len(tracking["ball"]), len(tracking["team"]), int((tracking["team"] == "H").sum()),
         int((tracking["team"] == "A").sum()),
         float(np.mean(~np.isnan(tracking["ball"][tracking["period"] > 0, 0])))))
+
+    graded = tracking["period"] > 0
+    ball_seen = float(np.mean(~np.isnan(tracking["ball"][graded, 0])))
+    players_seen = float(np.mean(np.any(~np.isnan(tracking["players"][graded, :, 0]), axis=1)))
+    if ball_seen < MIN_BALL_SEEN or players_seen < MIN_PLAYERS_SEEN:
+        sys.exit("only {:.0%} of graded frames have the ball and {:.0%} have players: the tracking "
+                 "frames did not map onto the video, not writing a file".format(ball_seen,
+                                                                                  players_seen))
 
     labels = np.asarray(model.predict(tracking), dtype="<U1")
     labels = np.where(tracking["period"] > 0, labels, "X")

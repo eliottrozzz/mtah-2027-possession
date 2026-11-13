@@ -1,0 +1,279 @@
+{
+ "model": "touch_dead_v3",
+ "spec": "models.touch_dead:TouchDead",
+ "settings": {
+  "touch": {
+   "min_strength": 1.0,
+   "min_strength_rel": null,
+   "radius_m": 3.5,
+   "window": 12,
+   "assign": "at",
+   "deflection_s": 0.5,
+   "reappear_s": 0.2,
+   "leave_m": 0.0,
+   "gap_rule": "advance",
+   "gap_min_s": 5.0,
+   "gap_shift_s": 1.0
+  },
+  "dead": {
+   "windows_s": [
+    2,
+    8,
+    20
+   ],
+   "side_window_s": 6,
+   "l2": 1.0,
+   "max_gap_frames": 100,
+   "carry_radius_m": 2.0,
+   "inputs": [
+    "median_speed",
+    "fast_speed",
+    "walking",
+    "sprinting",
+    "shape_moving",
+    "gathered",
+    "at_touchline",
+    "ball_out",
+    "ball_still"
+   ],
+   "post": {
+    "threshold": 0.65,
+    "min_dead_s": 4,
+    "min_live_s": 2
+   },
+   "post_grid": {
+    "threshold": [
+     0.35,
+     0.45,
+     0.55,
+     0.65
+    ],
+    "min_dead_s": [
+     2,
+     4,
+     8,
+     12
+    ],
+    "min_live_s": [
+     2,
+     4,
+     8,
+     12
+    ]
+   }
+  },
+  "restart_from_next_touch": true,
+  "snap": {
+   "snap": "first",
+   "snap_s": 2.0
+  }
+ },
+ "seed": 0,
+ "who": "Bucha",
+ "note": "new bar: copies place the stoppage ball still before the restart",
+ "time": "2026-11-13T13:12:50",
+ "branch": "jordan/scoring",
+ "commit": "41db328984d1c7ccb8764de4d7863a7c08837bd6",
+ "dirty": false,
+ "headline": 0.47238633564589216,
+ "per_game": {
+  "1": 0.49735981245452826,
+  "2": 0.4622074850046464,
+  "3": 0.4575917094785019
+ },
+ "cells": {
+  "1": {
+   "reception": {
+    "20": {
+     "spell_f1": 0.5106518282988871,
+     "macro_f1": 0.8536862429354257,
+     "n_gt_spells": 317,
+     "n_pred_spells": 312,
+     "spell_f1_range": [
+      0.4685532591414944,
+      0.5507154213036565
+     ]
+    },
+    "35": {
+     "spell_f1": 0.4840677966101694,
+     "macro_f1": 0.8223038686292913,
+     "n_gt_spells": 317,
+     "n_pred_spells": 273,
+     "spell_f1_range": [
+      0.43447457627118635,
+      0.5193898305084745
+     ]
+    },
+    "50": {
+     "spell_f1": 0.39289520426287744,
+     "macro_f1": 0.7987977108601849,
+     "n_gt_spells": 317,
+     "n_pred_spells": 246
+    },
+    "clean": {
+     "spell_f1": 0.7098039215686274,
+     "macro_f1": 0.8724365862652405,
+     "n_gt_spells": 317,
+     "n_pred_spells": 295
+    }
+   },
+   "kick": {
+    "20": {
+     "spell_f1": 0.4924499229583975,
+     "macro_f1": 0.8433101536312058,
+     "n_gt_spells": 337,
+     "n_pred_spells": 312
+    },
+    "35": {
+     "spell_f1": 0.4675409836065573,
+     "macro_f1": 0.8149978414403262,
+     "n_gt_spells": 337,
+     "n_pred_spells": 273
+    },
+    "50": {
+     "spell_f1": 0.3821612349914236,
+     "macro_f1": 0.7881111738654226,
+     "n_gt_spells": 337,
+     "n_pred_spells": 246
+    },
+    "clean": {
+     "spell_f1": 0.7278481012658228,
+     "macro_f1": 0.8860225593028597,
+     "n_gt_spells": 337,
+     "n_pred_spells": 295
+    }
+   }
+  },
+  "2": {
+   "reception": {
+    "20": {
+     "spell_f1": 0.47704654895666126,
+     "macro_f1": 0.8396858616749688,
+     "n_gt_spells": 288,
+     "n_pred_spells": 335,
+     "spell_f1_range": [
+      0.437784911717496,
+      0.5169181380417336
+     ]
+    },
+    "35": {
+     "spell_f1": 0.4473684210526316,
+     "macro_f1": 0.8195358038452634,
+     "n_gt_spells": 288,
+     "n_pred_spells": 320,
+     "spell_f1_range": [
+      0.41052631578947374,
+      0.4862171052631579
+     ]
+    },
+    "50": {
+     "spell_f1": 0.42361623616236166,
+     "macro_f1": 0.8128970977796599,
+     "n_gt_spells": 288,
+     "n_pred_spells": 254
+    },
+    "clean": {
+     "spell_f1": 0.7571929824561403,
+     "macro_f1": 0.8833110874470029,
+     "n_gt_spells": 288,
+     "n_pred_spells": 282
+    }
+   },
+   "kick": {
+    "20": {
+     "spell_f1": 0.4554517133956386,
+     "macro_f1": 0.8285561219260241,
+     "n_gt_spells": 307,
+     "n_pred_spells": 335
+    },
+    "35": {
+     "spell_f1": 0.42296650717703355,
+     "macro_f1": 0.8134500028724783,
+     "n_gt_spells": 307,
+     "n_pred_spells": 320
+    },
+    "50": {
+     "spell_f1": 0.41354723707664887,
+     "macro_f1": 0.8034586760014154,
+     "n_gt_spells": 307,
+     "n_pred_spells": 254
+    },
+    "clean": {
+     "spell_f1": 0.7660441426146012,
+     "macro_f1": 0.893881428647572,
+     "n_gt_spells": 307,
+     "n_pred_spells": 282
+    }
+   }
+  },
+  "3": {
+   "reception": {
+    "20": {
+     "spell_f1": 0.45132275132275135,
+     "macro_f1": 0.8362838649027836,
+     "n_gt_spells": 364,
+     "n_pred_spells": 392,
+     "spell_f1_range": [
+      0.4164021164021164,
+      0.48521164021164026
+     ]
+    },
+    "35": {
+     "spell_f1": 0.46386066763425254,
+     "macro_f1": 0.8219731472668409,
+     "n_gt_spells": 364,
+     "n_pred_spells": 325,
+     "spell_f1_range": [
+      0.4179680696661829,
+      0.5027866473149492
+     ]
+    },
+    "50": {
+     "spell_f1": 0.42633996937212865,
+     "macro_f1": 0.8119997749519289,
+     "n_gt_spells": 364,
+     "n_pred_spells": 289
+    },
+    "clean": {
+     "spell_f1": 0.7283667621776504,
+     "macro_f1": 0.8699549758242453,
+     "n_gt_spells": 364,
+     "n_pred_spells": 334
+    }
+   },
+   "kick": {
+    "20": {
+     "spell_f1": 0.4398963730569948,
+     "macro_f1": 0.8296988180144181,
+     "n_gt_spells": 380,
+     "n_pred_spells": 392
+    },
+    "35": {
+     "spell_f1": 0.4470921985815603,
+     "macro_f1": 0.8115011424436109,
+     "n_gt_spells": 380,
+     "n_pred_spells": 325
+    },
+    "50": {
+     "spell_f1": 0.4059790732436472,
+     "macro_f1": 0.8007953264858356,
+     "n_gt_spells": 380,
+     "n_pred_spells": 289
+    },
+    "clean": {
+     "spell_f1": 0.7568627450980392,
+     "macro_f1": 0.8843389793855962,
+     "n_gt_spells": 380,
+     "n_pred_spells": 334
+    }
+   }
+  }
+ },
+ "keep_rule": {
+  "against": "20261113-130849_touch_v1_seed0.json",
+  "against_model": "touch_v1",
+  "headline_gain": 0.122,
+  "drops_over_limit": {},
+  "keep": true
+ }
+}

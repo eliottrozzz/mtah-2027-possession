@@ -25,7 +25,8 @@ sys.path.insert(0, ROOT)
 sys.path.insert(0, os.path.join(ROOT, "starter"))
 from games import GAME, GAMES, half_video_blocks, require, source_frames  # noqa: E402
 import load_smart_tagging  # noqa: E402
-from models.touch import touch_strength  # noqa: E402
+sys.path.insert(0, HERE)
+import touch_signal as ts  # noqa: E402  (touch-strength percentiles at windows 4, 8, 12)
 
 # Params
 OUT_PATH = os.path.join(ROOT, "data", "ball_gap_stats.json")
@@ -39,7 +40,6 @@ CROWD_RADIUS = 3.0                                        # metres
 NEAR_GOAL = 0.17                                          # x within ~18 m of either goal line
 NEAR_TOUCHLINE = 0.10                                     # y within ~7 m of either touchline
 SET_PIECE_MARGIN_S = 5.0                                  # a gap "ends at" a set piece this close
-STRENGTH_QUANTILES = (50, 75, 90, 95, 99)
 
 
 def read_atd(raw_path, n_frames, n_slots):
@@ -160,8 +160,6 @@ def measure(game=GAME, data_dir=None):
     # Jitter: how much positions wobble, and the touch signal the model sees (same formula).
     ball_graded = np.where(graded[:, None], ball, np.nan)
     players_graded = np.where(graded[:, None, None], players, np.nan)
-    strength = touch_strength(ball_graded)
-    strength = strength[np.isfinite(strength)]
 
     return {
         "game": game,
@@ -185,8 +183,9 @@ def measure(game=GAME, data_dir=None):
                                  for q in GAP_QUANTILES},
         "ball_jitter_m": wobble_m(ball_graded, pitch),
         "player_jitter_m": wobble_m(players_graded, pitch),
-        "touch_strength_quantiles": {str(q): float(np.percentile(strength, q))
-                                     for q in STRENGTH_QUANTILES},
+        # Window 4 under "touch_strength_quantiles" (read by calibrate()), plus windows 8, 12.
+        **ts.touch_signal(ball_graded),
+        **ts.still_signal(ball_graded, int(graded.sum())),
     }
 
 
@@ -214,8 +213,8 @@ def show(stats):
         "p{} {:.1f}".format(q, v) for q, v in stats["fragment_quantiles_s"].items()))
     print("jitter (m per frame): ball {:.3f}, players {:.3f}".format(
         stats["ball_jitter_m"], stats["player_jitter_m"]))
-    print("velocity change over 0.16 s (m/s), percentiles: " + "  ".join(
-        "p{} {:.1f}".format(q, v) for q, v in stats["touch_strength_quantiles"].items()))
+    ts.show(stats)
+    ts.show_still(stats)
 
 
 def main():

@@ -1,0 +1,279 @@
+{
+ "model": "touch_dead_v3",
+ "spec": "models.touch_dead:TouchDead",
+ "settings": {
+  "touch": {
+   "min_strength": 2.0,
+   "min_strength_rel": null,
+   "radius_m": 3.5,
+   "window": 12,
+   "assign": "at",
+   "deflection_s": 0.5,
+   "reappear_s": 0.2,
+   "leave_m": 0.0,
+   "gap_rule": "advance",
+   "gap_min_s": 5.0,
+   "gap_shift_s": 2.0
+  },
+  "dead": {
+   "windows_s": [
+    2,
+    8,
+    20
+   ],
+   "side_window_s": 6,
+   "l2": 1.0,
+   "max_gap_frames": 100,
+   "carry_radius_m": 2.0,
+   "inputs": [
+    "median_speed",
+    "fast_speed",
+    "walking",
+    "sprinting",
+    "shape_moving",
+    "gathered",
+    "at_touchline",
+    "ball_out",
+    "ball_still"
+   ],
+   "post": {
+    "threshold": 0.45,
+    "min_dead_s": 8,
+    "min_live_s": 4
+   },
+   "post_grid": {
+    "threshold": [
+     0.35,
+     0.45,
+     0.55,
+     0.65
+    ],
+    "min_dead_s": [
+     2,
+     4,
+     8,
+     12
+    ],
+    "min_live_s": [
+     2,
+     4,
+     8,
+     12
+    ]
+   }
+  },
+  "restart_from_next_touch": true,
+  "snap": {
+   "snap": "first",
+   "snap_s": 3.0
+  }
+ },
+ "seed": 0,
+ "who": "agentB",
+ "note": "",
+ "time": "2026-11-13T12:50:25",
+ "branch": "jordan/dead-ball",
+ "commit": "c0f78380f94a4e0fb7fe7d75e6e9ec37f6b0773a",
+ "dirty": true,
+ "headline": 0.47885942901142076,
+ "per_game": {
+  "1": 0.5034341320055605,
+  "2": 0.46700075338373215,
+  "3": 0.4661434016449696
+ },
+ "cells": {
+  "1": {
+   "reception": {
+    "20": {
+     "spell_f1": 0.5004709576138147,
+     "macro_f1": 0.8422509678187513,
+     "n_gt_spells": 317,
+     "n_pred_spells": 320,
+     "spell_f1_range": [
+      0.460879120879121,
+      0.5388069073783359
+     ]
+    },
+    "35": {
+     "spell_f1": 0.5063973063973064,
+     "macro_f1": 0.8348221879904137,
+     "n_gt_spells": 317,
+     "n_pred_spells": 277,
+     "spell_f1_range": [
+      0.46185185185185185,
+      0.5481481481481482
+     ]
+    },
+    "50": {
+     "spell_f1": 0.3951048951048951,
+     "macro_f1": 0.7984454307068324,
+     "n_gt_spells": 317,
+     "n_pred_spells": 255
+    },
+    "clean": {
+     "spell_f1": 0.6962962962962964,
+     "macro_f1": 0.8327751199578229,
+     "n_gt_spells": 317,
+     "n_pred_spells": 277
+    }
+   },
+   "kick": {
+    "20": {
+     "spell_f1": 0.4949771689497717,
+     "macro_f1": 0.8398384889119047,
+     "n_gt_spells": 337,
+     "n_pred_spells": 320
+    },
+    "35": {
+     "spell_f1": 0.5074918566775245,
+     "macro_f1": 0.8337239186091002,
+     "n_gt_spells": 337,
+     "n_pred_spells": 277
+    },
+    "50": {
+     "spell_f1": 0.39054054054054055,
+     "macro_f1": 0.7950588440038416,
+     "n_gt_spells": 337,
+     "n_pred_spells": 255
+    },
+    "clean": {
+     "spell_f1": 0.711400651465798,
+     "macro_f1": 0.8454511129053098,
+     "n_gt_spells": 337,
+     "n_pred_spells": 277
+    }
+   }
+  },
+  "2": {
+   "reception": {
+    "20": {
+     "spell_f1": 0.49079365079365084,
+     "macro_f1": 0.8385956280162795,
+     "n_gt_spells": 288,
+     "n_pred_spells": 342,
+     "spell_f1_range": [
+      0.4514285714285714,
+      0.527015873015873
+     ]
+    },
+    "35": {
+     "spell_f1": 0.44320785597381346,
+     "macro_f1": 0.8323511999475461,
+     "n_gt_spells": 288,
+     "n_pred_spells": 323,
+     "spell_f1_range": [
+      0.41047463175122745,
+      0.4824877250409165
+     ]
+    },
+    "50": {
+     "spell_f1": 0.420216606498195,
+     "macro_f1": 0.8089958952212163,
+     "n_gt_spells": 288,
+     "n_pred_spells": 266
+    },
+    "clean": {
+     "spell_f1": 0.7401032702237522,
+     "macro_f1": 0.8817812739942132,
+     "n_gt_spells": 288,
+     "n_pred_spells": 293
+    }
+   },
+   "kick": {
+    "20": {
+     "spell_f1": 0.4721109399075501,
+     "macro_f1": 0.8275105450382968,
+     "n_gt_spells": 307,
+     "n_pred_spells": 342
+    },
+    "35": {
+     "spell_f1": 0.43428571428571433,
+     "macro_f1": 0.8274216833220502,
+     "n_gt_spells": 307,
+     "n_pred_spells": 323
+    },
+    "50": {
+     "spell_f1": 0.4139616055846422,
+     "macro_f1": 0.8050435838682377,
+     "n_gt_spells": 307,
+     "n_pred_spells": 266
+    },
+    "clean": {
+     "spell_f1": 0.7673333333333334,
+     "macro_f1": 0.8988814921437064,
+     "n_gt_spells": 307,
+     "n_pred_spells": 293
+    }
+   }
+  },
+  "3": {
+   "reception": {
+    "20": {
+     "spell_f1": 0.4669432918395574,
+     "macro_f1": 0.8270654522237718,
+     "n_gt_spells": 364,
+     "n_pred_spells": 359,
+     "spell_f1_range": [
+      0.4258921161825726,
+      0.5034578146611342
+     ]
+    },
+    "35": {
+     "spell_f1": 0.4653435114503817,
+     "macro_f1": 0.8149080410988966,
+     "n_gt_spells": 364,
+     "n_pred_spells": 291,
+     "spell_f1_range": [
+      0.4213435114503817,
+      0.5062595419847328
+     ]
+    },
+    "50": {
+     "spell_f1": 0.41954198473282445,
+     "macro_f1": 0.7887050622780754,
+     "n_gt_spells": 364,
+     "n_pred_spells": 291
+    },
+    "clean": {
+     "spell_f1": 0.7349253731343284,
+     "macro_f1": 0.8837985644428148,
+     "n_gt_spells": 364,
+     "n_pred_spells": 306
+    }
+   },
+   "kick": {
+    "20": {
+     "spell_f1": 0.4492557510148849,
+     "macro_f1": 0.8199375939149856,
+     "n_gt_spells": 380,
+     "n_pred_spells": 359
+    },
+    "35": {
+     "spell_f1": 0.45245901639344266,
+     "macro_f1": 0.8042821116591528,
+     "n_gt_spells": 380,
+     "n_pred_spells": 291
+    },
+    "50": {
+     "spell_f1": 0.39642324888226527,
+     "macro_f1": 0.7831442175234841,
+     "n_gt_spells": 380,
+     "n_pred_spells": 291
+    },
+    "clean": {
+     "spell_f1": 0.7568513119533529,
+     "macro_f1": 0.8953321877334859,
+     "n_gt_spells": 380,
+     "n_pred_spells": 306
+    }
+   }
+  }
+ },
+ "keep_rule": {
+  "against": "20261113-121250_touch_dead_v3_seed0.json",
+  "against_model": "touch_dead_v3",
+  "headline_gain": 0.015,
+  "drops_over_limit": {},
+  "keep": true
+ }
+}
