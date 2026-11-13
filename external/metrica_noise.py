@@ -84,6 +84,14 @@ DEAD_VISIBLE_PROB = 0.5        # chance a stoppage shows a ball for part of it
 CARRY_SPEED_MS = (4.0, 6.0)    # drawn per stoppage
 CARRY_SPEED_CANDIDATES = ((0.5, 1.5), (1.0, 3.0), (2.0, 4.0), (3.0, 5.0), (4.0, 6.0), (5.0, 7.0),
                           (2.0, 6.0))
+# Before the restart the carried ball often lies still at the spot (placed for a corner, throw-in or
+# free kick). The provided tracking shows a still ball (under 1 m/s for 2 s or more) on 5.2% of
+# visible frames, 4.3 times per 10 min, median 3.4 s (p90 8.5 s); live play alone gives about 0.3%
+# (checked 2026-11-13, summary numbers only). Fitted with --fit-stoppages.
+STILL_TAIL_PROB = 0.7          # chance a shown stoppage ends with the ball lying still (fitted)
+STILL_TAIL_S = 4.5             # median still time, fitted (lognormal, spread STILL_TAIL_SPREAD)
+STILL_TAIL_SPREAD = 0.6
+STILL_TAIL_CANDIDATES = [(p, t) for p in (0.3, 0.5, 0.7, 0.9) for t in (2.0, 3.0, 4.5, 6.0)]
 CARRY_TURN_PER_S = 1.0         # how fast it steers toward the restart spot
 CARRY_WANDER = 1.0             # random turning, radians per sqrt(second)
 
@@ -344,7 +352,13 @@ def carry_dead_ball(ball, labels, rng):
         a = ball[before[-1]] if len(before) else ball[start + np.argmax(shown)]
         b = ball[after[0]] if len(after) else a
         n = stop - start
+        tail = 0
+        if rng.random() < STILL_TAIL_PROB:
+            seconds = STILL_TAIL_S * np.exp(rng.normal(0.0, STILL_TAIL_SPREAD))
+            tail = min(int(seconds * FPS), max(n - FPS, 0))
         path = carried_ball(n, a * pitch, b * pitch, rng)
+        if tail:
+            path[n - tail:] = path[n - tail - 1]            # placed at the spot, then still
         blur = min(BALL_SMOOTH_FRAMES, n if n % 2 else n - 1)
         out[start:stop][shown] = (smooth(path, max(blur, 1)) / pitch)[shown]
     return out.astype(np.float32)
@@ -437,6 +451,56 @@ def describe(game_no, level, seed, data, labels):
               objects[graded].mean()))
 
 
+def stoppage_miss(stats):
+    """(miss, touch percentiles, still summary) of live20/35 seed-0 copies of all three games,
+    built in memory, against the real touch signal and still-ball summary."""
+    import touch_signal as ts
+    from models.touch import touch_strength
+    keys = {4: "touch_strength_quantiles", 8: "touch_strength_quantiles_w8",
+            12: "touch_strength_quantiles_w12"}
+    qs = sorted(QUANTILE_KEYS, key=float)
+    goal = {w: np.array([stats[k][q] for q in qs]) for w, k in keys.items() if k in stats}
+    got, still = {w: [] for w in goal}, []
+    for game_no in (1, 2, 3):
+        for level in (20, 35):
+            data, _ = make_noisy(game_no, level, 0)
+            graded = data["period"] > 0
+            ball = np.where(graded[:, None], data["ball"], np.nan)
+            for w in goal:
+                st = touch_strength(ball, w)
+                st = st[np.isfinite(st)]
+                got[w].append(np.percentile(st, [float(q) for q in qs]))
+            still.append(ts.still_signal(ball, int(graded.sum())))
+    got = {w: np.mean(v, axis=0) for w, v in got.items()}
+    miss = sum(np.abs(np.log(np.maximum(got[w], 1e-3) / goal[w])).sum() for w in goal)
+    summary = {"share": np.mean([x["still_share_of_seen"] for x in still]),
+               "per_10min": np.mean([x["still_per_10min"] for x in still]),
+               "lengths": np.mean([[x["still_length_quantiles_s"][q] for q in ("25", "50", "75", "90")]
+                                   for x in still], axis=0)}
+    if "still_share_of_seen" in stats:
+        real_len = np.array([stats["still_length_quantiles_s"][q] for q in ("25", "50", "75", "90")])
+        miss += abs(np.log(max(summary["share"], 1e-4) / stats["still_share_of_seen"]))
+        miss += abs(np.log(max(summary["per_10min"], 1e-2) / stats["still_per_10min"]))
+        miss += np.abs(np.log(np.maximum(summary["lengths"], 1e-2) / real_len)).sum()
+    return miss, got, summary
+
+
+def fit_still_tail(stats):
+    """Print the miss for each (STILL_TAIL_PROB, STILL_TAIL_S) candidate. Writes nothing."""
+    global STILL_TAIL_PROB, STILL_TAIL_S
+    keep, results = (STILL_TAIL_PROB, STILL_TAIL_S), []
+    for prob, seconds in STILL_TAIL_CANDIDATES:
+        STILL_TAIL_PROB, STILL_TAIL_S = prob, seconds
+        miss, _, summary = stoppage_miss(stats)
+        results.append((miss, prob, seconds))
+        print("still tail p {:.1f}, median {:.1f} s: miss {:.2f}   still {:.1%}, {:.1f}/10 min, "
+              "lengths p25-p90 {}".format(prob, seconds, miss, summary["share"],
+                                          summary["per_10min"],
+                                          np.round(summary["lengths"], 1).tolist()))
+    STILL_TAIL_PROB, STILL_TAIL_S = keep
+    print("best:", min(results)[1:])
+
+
 def fit_stoppage_ball(stats):
     """Print, for each CARRY_SPEED_CANDIDATES range, how well the finished copies' touch signal
     at windows 4, 8 and 12 matches the real one (summed |log ratio| over the percentiles), using
@@ -484,6 +548,7 @@ def main():
         print("calibrated on {}: real match missing {:.0%} of graded frames".format(
             stats["game"], stats["ball_missing_rate"]))
         if args.fit_stoppages:
+            fit_still_tail(stats)
             fit_stoppage_ball(stats)
             return
     os.makedirs(OUT_DIR, exist_ok=True)
