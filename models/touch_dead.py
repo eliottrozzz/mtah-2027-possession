@@ -1,4 +1,11 @@
-"""Model v2: v1's last-touch possession plus Track B's dead-ball detector.
+"""Model v3: v1's last-touch possession plus Track B's dead-ball detector.
+
+Versions (headline on the copies of the time):
+    v2  2026-11-11  last touch + dead-ball detector + team from the first touch after a stoppage
+    v3  2026-11-13  + the ball reappearing after a gap counts as a touch (reappear_s), + the
+                    detector measures player speed over 0.4 s, trained on copies whose stoppage
+                    ball is carried to the restart: 0.460. Runs before 2026-11-13 are logged
+                    under the name touch_dead_v2.
 
     1. LastTouch (models/touch.py) says which team has the ball, from touches.
     2. DeadBallDetector (models/dead_ball.py) says when the ball is dead, mainly from the players.
@@ -24,7 +31,7 @@ def runs(mask):
 
 
 class TouchDead:
-    name = "touch_dead_v2"
+    name = "touch_dead_v3"
     restart_from_next_touch = True
 
     def __init__(self):
@@ -61,5 +68,5 @@ class TouchDead:
 
 class TouchDeadCarry(TouchDead):
     """The same, but the team before a stoppage carries over to after it (for comparison)."""
-    name = "touch_dead_v2_carry"
+    name = "touch_dead_v3_carry"
     restart_from_next_touch = False
