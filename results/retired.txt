@@ -13,3 +13,5 @@
 20261111-125745_touch_dead_v2_seed0.json  # scored on the old answer key; Eliott's goal-kick/keeper rule (9cdedd6) changed the key (2026-11-12)
 20261111-134404_touch_dead_v2_seed0.json  # scored on the old noisy copies and the old answer key; its KEEP compared against retired runs (2026-11-12)
 20261112-125735_touch_dead_v2_seed0.json  # leave_m 'ball moves away from the kicker': +0.006 on noisy copies, but clean fell up to 0.16, so it fitted our simulated blur; not kept (Jordan, 2026-11-12)
+20261112-122051_touch_dead_v2_seed0.json  # no wobble fix; Jordan chose the 0.4 s player-speed step for robustness (0.472 is the bar from here, 2026-11-13)
+20261112-131759_touch_dead_v2_seed0.json  # no wobble fix; Jordan chose the 0.4 s player-speed step for robustness (0.472 is the bar from here, 2026-11-13)
