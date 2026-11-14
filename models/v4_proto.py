@@ -419,7 +419,7 @@ class V4ProtoTouch(V4Proto):
 
 class V4ProtoCap(V4Proto):
     """One switch penalty, capped at 1 (no separate cheap/other penalties)."""
-    name = "v4_proto_cap"
+    name = "v4"  # was v4_proto_cap (runs 150253 seed 0, 152536 seed 1)
     switch_mode = "single"
     decode_grid = CAP_DECODE_GRID
     switch_grid = {}
