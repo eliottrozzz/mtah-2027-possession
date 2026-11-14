@@ -70,7 +70,36 @@ We avoid it in three ways, together:
 
 # Sealed test set: the DFL / Bundesliga open dataset
 
-Seven official matches (2 Bundesliga, 5 2. Bundesliga, 2022/23), with the league's own in-stadium tracking at 25 fps and official event data. **A sealed test: nothing is fitted or tuned on it.** It is scored only on the 2–3 final candidates, around Nov 14–15, and nobody looks at a real model's DFL score before then.
+Seven official matches (2 Bundesliga, 5 2. Bundesliga, 2022/23), with the league's own in-stadium tracking at 25 fps and official event data. It was a sealed test for the final candidates, with two looks: look 1 (v3 0.372, v3.1 0.390, two-tier 0.393; 2026-11-13) and look 2 (v4 0.406; 2026-11-14). **Both looks are spent**, so `--sealed` now refuses real models; only `--oracle` still runs.
+
+## DFL split: 4 TRAIN, 3 TEST (2026-11-14)
+
+After both looks, Jordan split the 7 matches so later v4 work can train on DFL. The split is **fixed by a rule, not by scores**, and written into `evaluation/score_external.py` (`DFL_TRAIN`, `DFL_TEST`) before anyone trained on DFL:
+
+* **TEST = the 3 highest match IDs among the 5 sync-holdout matches:** J03WPY, J03WQQ, J03WR9. The 2 sync development matches (`dfl_sync.DEV`: J03WMX, J03WOH) are never test.
+* **TRAIN = the other 4:** J03WMX, J03WN1, J03WOH, J03WOY. Free to fit and tune on.
+
+| | test-3 headline | train-4 | all 7 |
+|---|---|---|---|
+| v3 | 0.387 | 0.361 | 0.372 |
+| v3.1 | 0.407 | 0.378 | 0.390 |
+| two-tier | 0.409 | 0.382 | 0.393 |
+| v4 | 0.415 | 0.399 | 0.406 |
+
+These baselines come from the look-1 and look-2 logs (fit on Metrica only), not from new runs. With 3 matches, differences under about 0.01 are noise.
+
+```python
+import score_external as se                 # evaluation/ on sys.path
+train = se.metrica_train_set() + se.dfl_train_set()   # [(tracking, reception key)], live20/35, seed 0
+```
+
+```bash
+.venv/bin/python evaluation/score_external.py --dfl-test --oracle                  # must print PASS
+.venv/bin/python evaluation/score_external.py --dfl-test --model <candidate>       # Metrica-only fit
+.venv/bin/python evaluation/score_external.py --dfl-test --model <candidate> --fit-dfl-train
+```
+
+**One test-3 run per candidate, only after it passes both Metrica seeds.** The script refuses a model (matched by name or `module:Class`) with no logged seed-1 run, or one that already has a test-3 run (`--again` overrides; give the reason in `--note`). Runs are logged with seed `dfl-test` and listed by `--summary`. Nothing is tuned in response to a test score.
 
 **Licence: CC BY 4.0**, confirmed on the Figshare record (checked 2026-11-11). We use it unchanged for research and keep it out of git (`data/` is gitignored); only code and scores are published.
 
@@ -82,7 +111,6 @@ Seven official matches (2 Bundesliga, 5 2. Bundesliga, 2022/23), with the league
 .venv/bin/python external/dfl_labels.py        # answer key; add --restart kick for the kick key
 .venv/bin/python external/dfl_noise.py --calibration data/ball_gap_stats.json   # live20/35/50, seed 0
 .venv/bin/python evaluation/score_external.py --sealed --oracle                 # must print PASS
-.venv/bin/python evaluation/score_external.py --sealed --model <finalist> --confirm-milestone
 ```
 
 Everything lives in `data/external/dfl/`. Tracking rows are not DFL frame numbers: row 0 is empty, then the first half, one empty row, then the second half (DFL numbers them from 10000 and 100000).

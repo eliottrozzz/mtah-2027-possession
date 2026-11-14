@@ -7,7 +7,8 @@ match, its ground truth or its video.
     python evaluation/score_external.py --model models.baselines:NoBallDead --seed 1   # milestone
     python evaluation/score_external.py --summary                                      # the log
     python evaluation/score_external.py --sealed --oracle                 # check the sealed set
-    python evaluation/score_external.py --sealed --model ... --confirm-milestone      # finalists
+    python evaluation/score_external.py --sealed --model ... --confirm-milestone      # spent
+    python evaluation/score_external.py --dfl-test --model ...      # once per candidate (see below)
 
 How it works (agreed 2026-11-11, see TEAM_SETUP.md):
   * Train on two games, test on the third, three rounds. fit() sees the training games at the
@@ -32,6 +33,20 @@ SEALED TEST (--sealed): the 7 DFL games (external/dfl_*.py), a separate mileston
     before then, and nothing is tweaked in response to it. A real model needs --confirm-milestone;
     every such run is logged (seed "sealed") and listed separately by --summary.
   * --oracle predicts the answer key itself: the reception key must score 1.0. Never logged.
+  * SPENT: looks 1 (v3, v3.1, two-tier) and 2 (v4) were the two looks. A real model can no longer
+    be scored on all 7 games, since 3 of them are now the DFL test set below. --oracle still works.
+
+DFL SPLIT (Jordan, 2026-11-14, after both sealed looks): 4 TRAIN and 3 TEST matches, fixed by a
+rule, not by scores. TEST = the 3 highest match IDs among the 5 sync-holdout matches (the 2 sync
+development matches, external/dfl_sync.DEV, are never test). TRAIN = the other 4.
+  * TRAIN (DFL_TRAIN): free to fit and tune on. dfl_train_set() gives their copies (live20/35,
+    seed 0) with reception answer keys as (tracking, key) pairs, the same format as Metrica's.
+  * TEST (--dfl-test): scored like the sealed set (all levels, both keys, headline = reception,
+    live20/35, mean over the 3 games), logged with seed "dfl-test" and listed by --summary.
+    fit() sees the 3 Metrica games; add --fit-dfl-train to also give it the 4 TRAIN matches.
+    ONE run per candidate, only after it passes both Metrica seeds: the script refuses a model
+    with no logged seed-1 run, or one that already has a dfl-test run (--again overrides; say why
+    in --note). Nothing is tuned in response to a test score.
 
 Each run writes one file to results/runs/ (one per run, so parallel work doesn't conflict).
 """
@@ -78,6 +93,13 @@ SEALED_GAMES = dfl.MATCHES            # the 7 DFL games: test only, never fitted
 SEALED_SEED = 0                       # the only noisy DFL copies there are
 SEALED_LABEL_PATH = os.path.join(dfl.OUT_DIR, "{}_labels_{}.csv")
 SEALED_NOISY_PATH = os.path.join(dfl.OUT_DIR, "noisy", "{}_live{}_seed{}.npz")
+# DFL split (see the docstring). Fixed by rule: the 3 highest IDs among the 5 sync-holdout matches.
+DFL_SYNC_DEV = ("J03WMX", "J03WOH")            # = external/dfl_sync.DEV (checked in test_split)
+DFL_TEST = tuple(sorted(m for m in dfl.MATCHES if m not in DFL_SYNC_DEV)[-3:])
+DFL_TRAIN = tuple(m for m in dfl.MATCHES if m not in DFL_TEST)
+assert DFL_TEST == ("J03WPY", "J03WQQ", "J03WR9"), DFL_TEST
+assert DFL_TRAIN == ("J03WMX", "J03WN1", "J03WOH", "J03WOY"), DFL_TRAIN
+DFL_TEST_SEED = "dfl-test"                      # the log's seed field for test-3 runs
 
 
 # -- data --------------------------------------------------------------------------------------
@@ -113,6 +135,28 @@ def load_answer_key(game, key, period, sealed=False):
     if len(second_half):
         labels[second_half[0]] = "X"
     return pm.label_codes(labels)
+
+
+def metrica_train_set(levels=TUNING_LEVELS, seed=0):
+    """[(tracking, reception key)] for the 3 Metrica games: what fit() sees everywhere."""
+    out = []
+    for g in GAMES:
+        for level in levels:
+            tracking = load_tracking(g, level, seed)
+            out.append((tracking, load_answer_key(g, HEADLINE_KEY, tracking["period"])))
+    return out
+
+
+def dfl_train_set(levels=TUNING_LEVELS, key=HEADLINE_KEY):
+    """[(tracking, answer key)] for the 4 DFL TRAIN matches (seed 0, the only DFL copies), same
+    format as Metrica's. Never includes a DFL_TEST match."""
+    out = []
+    for match in DFL_TRAIN:
+        assert match not in DFL_TEST
+        for level in levels:
+            tracking = load_tracking(match, level, SEALED_SEED, sealed=True)
+            out.append((tracking, load_answer_key(match, key, tracking["period"], sealed=True)))
+    return out
 
 
 def load_model(spec):
@@ -201,22 +245,22 @@ def run(spec, seed, levels, jobs=len(GAMES)):
     return cells, settings
 
 
-def run_sealed(spec, levels, oracle=False):
-    """{dfl game: {key: {level: cell}}}, after one fit on all three Metrica games (or none, for
-    the oracle, which predicts the reception key itself). No DFL data reaches fit()."""
+def run_sealed(spec, levels, oracle=False, games=SEALED_GAMES, fit_dfl_train=False):
+    """{dfl game: {key: {level: cell}}}, after one fit on all three Metrica games, plus the 4 DFL
+    TRAIN matches if fit_dfl_train (or no fit, for the oracle, which predicts the reception key
+    itself). No scored DFL game ever reaches fit()."""
     model = None
     if not oracle:
         model = load_model(spec)
-        train = []
-        for g in GAMES:
-            for level in TUNING_LEVELS:
-                tracking = load_tracking(g, level, 0)
-                train.append((tracking, load_answer_key(g, HEADLINE_KEY, tracking["period"])))
+        train = metrica_train_set()
+        if fit_dfl_train:
+            assert not set(DFL_TRAIN) & set(games), "a scored DFL game would be fitted on"
+            train += dfl_train_set()
         model.fit(train)
         del train
     letters = np.array(["H", "A", "D"])
     cells = {}
-    for game in SEALED_GAMES:
+    for game in games:
         period = load_tracking(game, "clean", SEALED_SEED, sealed=True)["period"]
         gts = {key: load_answer_key(game, key, period, sealed=True) for key in KEYS}
         cells[game] = {key: {} for key in KEYS}
@@ -269,7 +313,8 @@ def load_runs(seed=None):
 
 
 def cells_from_log(entry):
-    return {(g if entry["seed"] == "sealed" else int(g)): v for g, v in entry["cells"].items()}
+    return {(g if entry["seed"] in ("sealed", DFL_TEST_SEED) else int(g)): v
+            for g, v in entry["cells"].items()}
 
 
 def retired_runs():
@@ -316,10 +361,12 @@ def clean_results(cells):
 def show(entry):
     cells = cells_from_log(entry)
     games = list(cells)
+    title = {"sealed": ("SEALED DFL TEST", "SEALED HEADLINE"),
+             DFL_TEST_SEED: ("DFL TEST-3" + (" (fit +DFL train)" if entry.get("fit_dfl_train")
+                                             else ""), "DFL TEST HEADLINE")}
+    label, head = title.get(entry["seed"], ("seed {}".format(entry["seed"]), "headline"))
     print("\n{}  {}  {} {:.3f} ({})".format(
-        entry["model"], "SEALED DFL TEST" if entry["seed"] == "sealed" else
-        "seed {}".format(entry["seed"]),
-        "SEALED HEADLINE" if entry["seed"] == "sealed" else "headline", entry["headline"],
+        entry["model"], label, head, entry["headline"],
         " / ".join("{:.2f}".format(entry["per_game"][str(g)]) for g in games)))
     levels = list(cells[games[0]][HEADLINE_KEY].keys())
     print("{:<12}".format("spellF1") + "".join(
@@ -337,15 +384,18 @@ def show(entry):
         print("against best so far ({}): headline {:+.3f}, drops over {} ({} clean): {} -> {}"
               .format(rule["against_model"], rule["headline_gain"], MAX_DROP, CLEAN_MAX_DROP,
             rule["drops_over_limit"] or "none", verdict))
-    elif entry["seed"] == "sealed":
-        print("sealed milestone: no keep rule, and nothing gets tweaked in response")
+    elif entry["seed"] in ("sealed", DFL_TEST_SEED):
+        print("{}: no keep rule, and nothing gets tweaked in response".format(
+            "sealed milestone" if entry["seed"] == "sealed" else "DFL test-3 (one run per candidate)"))
     else:
         print("first run on this seed: nothing to compare against")
 
 
 def summary():
     for seed, title in ((0, "TUNING RUNS (seed 0)"), (1, "MILESTONE RUNS (seed 1)"),
-                        ("sealed", "SEALED DFL RUNS (milestone, separate from the headline)")):
+                        ("sealed", "SEALED DFL RUNS (milestone, separate from the headline)"),
+                        (DFL_TEST_SEED, "DFL TEST-3 RUNS ({}; one per candidate)".format(
+                            ", ".join(DFL_TEST)))):
         runs = sorted(load_runs(seed), key=lambda e: -e["headline"])
         retired = retired_runs()
         print("\n" + title)
@@ -376,17 +426,27 @@ def main():
                         help="with --sealed: predict the answer key itself (must score 1.0)")
     parser.add_argument("--confirm-milestone", action="store_true",
                         help="with --sealed and a real model: yes, this is a final candidate")
+    parser.add_argument("--dfl-test", action="store_true",
+                        help="score on the 3 DFL TEST matches (once per candidate; see docstring)")
+    parser.add_argument("--fit-dfl-train", action="store_true",
+                        help="with --dfl-test: fit on Metrica plus the 4 DFL TRAIN matches")
+    parser.add_argument("--again", action="store_true",
+                        help="with --dfl-test: allow a second test run of the same model name")
     parser.add_argument("--summary", action="store_true", help="print the log and stop")
     args = parser.parse_args()
 
     if args.summary:
         summary()
         return
-    if args.sealed:
+    if args.sealed and args.dfl_test:
+        parser.error("--sealed and --dfl-test are separate modes")
+    if args.sealed or args.dfl_test:
         sealed_main(args)
         return
     if args.oracle:
-        parser.error("--oracle only works with --sealed")
+        parser.error("--oracle only works with --sealed or --dfl-test")
+    if args.fit_dfl_train or args.again:
+        parser.error("--fit-dfl-train and --again only work with --dfl-test")
     if not args.model:
         parser.error("--model is required (or use --summary)")
 
@@ -417,23 +477,51 @@ def main():
         print("logged results/runs/" + name)
 
 
+def dfl_test_allowed(name, spec, again):
+    """None if the model (by name, or by module:Class spec, since models get renamed) may have its
+    one DFL test-3 run, else the reason it may not."""
+    def same(e):
+        return e["model"] == name or e.get("spec") == spec
+    if not any(same(e) for e in load_runs(1)):
+        return ("{} ({}) has no logged Metrica seed-1 run. The DFL test is only for candidates "
+                "that passed both Metrica seeds.".format(name, spec))
+    done = [e["_file"] for e in load_runs(DFL_TEST_SEED) if same(e)]
+    if done and not again:
+        return ("{} already has a DFL test-3 run ({}). One run per candidate; --again only with "
+                "a reason in --note.".format(name, ", ".join(done)))
+    return None
+
+
 def sealed_main(args):
     levels = list(TUNING_LEVELS) + list(STRESS_LEVELS) + list(INFO_LEVELS)
+    test = args.dfl_test
+    games = DFL_TEST if test else SEALED_GAMES
+    seed_tag = DFL_TEST_SEED if test else "sealed"
+    if args.fit_dfl_train and not test:
+        sys.exit("--fit-dfl-train only works with --dfl-test")
     if args.oracle:
         name, spec = "oracle_answer_key", None
     else:
+        mode = "--dfl-test" if test else "--sealed"
         if not args.model:
-            sys.exit("--sealed needs --model (or --oracle)")
-        if not args.confirm_milestone:
-            sys.exit("--sealed is the milestone test for the 2-3 final candidates only. Nobody "
-                     "looks at a real model's DFL score before then. Add --confirm-milestone.")
+            sys.exit("{} needs --model (or --oracle)".format(mode))
         name, spec = load_model(args.model).name, args.model
-    print("SEALED DFL TEST: scoring {} on {} games (fit on Metrica only)".format(
-        name, len(SEALED_GAMES)))
-    cells, settings = run_sealed(spec, levels, oracle=args.oracle)
+        if test:
+            reason = dfl_test_allowed(name, spec, args.again)
+            if reason:
+                sys.exit(reason)
+        else:
+            sys.exit("--sealed is spent: looks 1 and 2 were the two looks, and 3 of its games are "
+                     "now the DFL test set. Use --dfl-test (see the docstring). --oracle still works.")
+    print("{}: scoring {} on {} games ({}), fit on Metrica{}".format(
+        "DFL TEST-3" if test else "SEALED DFL TEST", name, len(games), ", ".join(games),
+        " + the 4 DFL TRAIN matches" if args.fit_dfl_train else " only"))
+    cells, settings = run_sealed(spec, levels, oracle=args.oracle, games=games,
+                                 fit_dfl_train=args.fit_dfl_train)
     total, per_game = headline(cells)
     entry = {
-        "model": name, "spec": spec, "settings": settings, "seed": "sealed",
+        "model": name, "spec": spec, "settings": settings, "seed": seed_tag,
+        "fit_dfl_train": bool(args.fit_dfl_train), "dfl_games": list(games),
         "who": args.who, "note": args.note,
         "time": datetime.datetime.now().isoformat(timespec="seconds"),
         "branch": git("rev-parse", "--abbrev-ref", "HEAD"), "commit": git("rev-parse", "HEAD"),
@@ -452,8 +540,9 @@ def sealed_main(args):
         return
     if not args.no_log:
         os.makedirs(RUNS_DIR, exist_ok=True)
-        file_name = "{}_{}_sealed.json".format(
-            datetime.datetime.now().strftime("%Y%m%d-%H%M%S"), name)
+        file_name = "{}_{}_{}.json".format(
+            datetime.datetime.now().strftime("%Y%m%d-%H%M%S"), name,
+            "dfltest" if test else "sealed")
         with open(os.path.join(RUNS_DIR, file_name), "w") as handle:
             json.dump(entry, handle, indent=1)
         print("logged results/runs/" + file_name)
