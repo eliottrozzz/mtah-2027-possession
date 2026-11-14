@@ -87,11 +87,17 @@ DEFLECTION_CANDIDATES = (0.5,)
 # Fitted last, with everything else fixed; "off" is a candidate.
 CONFIRM_CANDIDATES = ({"confirm": "off"},)
 CONFIRM_STEADY = 0.7            # share of frames the distance must grow on
+# Long deflection window only where the ball is doubtful (Track C, 2026-11-14, Jordan's middle
+# ground): a touch by the other team whose ball is unseen anywhere within +-long_unseen_w s of it,
+# or that is a reappearance (or gap switch) touch, gets long_deflection_s instead of deflection_s.
+# Clearly tracked touches keep the 0.5 s rule and the 0.75 s cap. Physics and visibility only,
+# never "who touches next". Fitted after the deflection stage; "off" is a candidate.
+LONG_DEFLECTION_CANDIDATES = ({"long_deflection_s": 0.0},)
 ADVANCE_STEP_S = 1.0            # team centre velocity measured over this long
 ADVANCE_SMOOTH_S = 2.0          # then averaged over this long
 STRENGTH_QUANTILE = 0.9
 DEFAULTS = {"min_strength": 2.0, "min_strength_rel": None, "radius_m": 2.5, "window": 8, "assign": "at",
-            "deflection_s": 0.5, "reappear_s": 0.0,
+            "deflection_s": 0.5, "reappear_s": 0.0, "long_deflection_s": 0.0, "long_unseen_w": 0.5,
             "leave_m": 0.0, "gap_rule": "off"}
 AFTER_FRAMES = 12               # "after": how long the toucher should stay near the ball (0.48 s)
 
@@ -301,12 +307,36 @@ def all_touches(tracking, params):
         gap_frames, gap_teams = gap_switches(tracking, params, frames, teams)
         re_frames = np.concatenate((re_frames, gap_frames)).astype(int)
         re_teams = np.concatenate((re_teams, gap_teams))
+    from_gap = np.zeros(len(frames), dtype=bool)
     if len(re_frames):
         frames = np.concatenate((frames, re_frames))
         teams = np.concatenate((teams, re_teams))
+        from_gap = np.concatenate((from_gap, np.ones(len(re_frames), dtype=bool)))
         order = np.argsort(frames, kind="stable")
-        frames, teams = frames[order], teams[order]
-    return drop_deflections(frames, teams, int(params["deflection_s"] * FPS))
+        frames, teams, from_gap = frames[order], teams[order], from_gap[order]
+    return drop_deflections(frames, teams, deflection_windows(tracking, frames, from_gap, params))
+
+
+def doubtful_touches(tracking, frames, from_gap, w_s):
+    """True for touches whose ball is unseen anywhere within +-w_s s, or that come from a gap."""
+    missing = np.isnan(tracking["ball"][:, 0]).astype(np.int32)
+    w = int(round(w_s * FPS))
+    cum = np.concatenate(([0], np.cumsum(missing)))
+    lo = np.clip(frames - w, 0, len(missing))
+    hi = np.clip(frames + w + 1, 0, len(missing))
+    return from_gap | (cum[hi] - cum[lo] > 0)
+
+
+def deflection_windows(tracking, frames, from_gap, params):
+    """Per-touch deflection window in frames (see LONG_DEFLECTION_CANDIDATES)."""
+    short = int(params["deflection_s"] * FPS)
+    windows = np.full(len(frames), short, dtype=int)
+    long_s = params.get("long_deflection_s", 0.0)
+    if long_s > 0 and len(frames):
+        doubt = doubtful_touches(tracking, np.asarray(frames, dtype=int), from_gap,
+                                 params["long_unseen_w"])
+        windows[doubt] = max(short, int(long_s * FPS))
+    return windows
 
 
 def confirmed(tracking, frame, team, params):
@@ -351,8 +381,11 @@ def confirm_switches(tracking, frames, teams, params):
 
 
 def drop_deflections(frames, teams, deflection_frames):
-    """Remove touches by the other team that the original team gets back within the window."""
-    if deflection_frames <= 0 or len(frames) < 3:
+    """Remove touches by the other team that the original team gets back within the window.
+    deflection_frames is one window, or one per touch (the window of the other team's first touch
+    applies)."""
+    windows = np.broadcast_to(np.asarray(deflection_frames, dtype=int), (len(frames),))
+    if not len(frames) or windows.max() <= 0 or len(frames) < 3:
         return frames, teams
     keep = np.ones(len(frames), dtype=bool)
     holder, i = teams[0], 1
@@ -365,7 +398,7 @@ def drop_deflections(frames, teams, deflection_frames):
         j = i + 1
         while j < len(frames) and teams[j] != holder:
             j += 1
-        if j < len(frames) and frames[j] - frames[i] <= deflection_frames:
+        if j < len(frames) and frames[j] - frames[i] <= windows[i]:
             keep[i:j] = False
             i = j
         else:
@@ -388,9 +421,11 @@ class LastTouch:
     name = "touch_v1"
 
     def __init__(self, deflection_candidates=DEFLECTION_CANDIDATES,
-                 confirm_candidates=CONFIRM_CANDIDATES, **params):
+                 confirm_candidates=CONFIRM_CANDIDATES,
+                 long_deflection_candidates=LONG_DEFLECTION_CANDIDATES, **params):
         self.params = dict(DEFAULTS, **params)
         self.deflection_candidates = tuple(deflection_candidates)
+        self.long_deflection_candidates = tuple(long_deflection_candidates)
         self.confirm_candidates = tuple(confirm_candidates)
 
     def settings(self):
@@ -428,6 +463,14 @@ class LastTouch:
             if deflection_s == base["deflection_s"]:
                 continue
             params = dict(base, deflection_s=deflection_s)
+            value = score(params)
+            if value > best_score:
+                best, best_score = params, value
+        base = best
+        for long in self.long_deflection_candidates:
+            if long.get("long_deflection_s", 0.0) <= 0:
+                continue                              # base is already "off"
+            params = dict(base, **long)
             value = score(params)
             if value > best_score:
                 best, best_score = params, value

@@ -239,3 +239,19 @@ class TouchDeadShapeUnseenConfirm(TouchDeadShapeUnseen):
             {"confirm": "on", "confirm_s": 0.75, "confirm_away_m": 2.0},
             {"confirm": "on", "confirm_s": 0.75, "confirm_away_m": 3.0},
             {"confirm": "on", "confirm_s": 1.0, "confirm_away_m": 4.0}))
+
+
+class TouchDeadShapeUnseenLongDeflection(TouchDeadShapeUnseen):
+    """v3.1 plus a long deflection window only on doubtful touches (ball unseen within +-W s, or a
+    reappearance touch), "off" included, picked by fit (Track C, 2026-11-14, Jordan's middle
+    ground). Clearly tracked touches keep 0.5 s."""
+    name = "v3.1_long_deflection_unseen"
+
+    def __init__(self):
+        super().__init__()
+        self.touch = LastTouch(long_deflection_candidates=(
+            {"long_deflection_s": 0.0},
+            {"long_deflection_s": 1.0, "long_unseen_w": 0.5},
+            {"long_deflection_s": 1.0, "long_unseen_w": 1.0},
+            {"long_deflection_s": 1.5, "long_unseen_w": 0.5},
+            {"long_deflection_s": 1.5, "long_unseen_w": 1.0}))

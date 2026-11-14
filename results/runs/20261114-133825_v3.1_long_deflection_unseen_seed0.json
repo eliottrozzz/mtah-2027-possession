@@ -1,0 +1,303 @@
+{
+ "model": "v3.1_long_deflection_unseen",
+ "spec": "models.touch_dead:TouchDeadShapeUnseenLongDeflection",
+ "settings": {
+  "touch": {
+   "min_strength": 1.0,
+   "min_strength_rel": null,
+   "radius_m": 3.5,
+   "window": 12,
+   "assign": "at",
+   "deflection_s": 0.5,
+   "reappear_s": 0.2,
+   "long_deflection_s": 1.5,
+   "long_unseen_w": 1.0,
+   "leave_m": 0.0,
+   "gap_rule": "advance",
+   "gap_min_s": 5.0,
+   "gap_shift_s": 1.0
+  },
+  "dead": {
+   "windows_s": [
+    2,
+    8,
+    20
+   ],
+   "side_window_s": 6,
+   "l2": 1.0,
+   "max_gap_frames": 100,
+   "carry_radius_m": 2.0,
+   "inputs": [
+    "median_speed",
+    "fast_speed",
+    "walking",
+    "sprinting",
+    "shape_moving",
+    "gathered",
+    "at_touchline",
+    "ball_out",
+    "ball_still",
+    "still_stretch",
+    "out_then_still"
+   ],
+   "post": {
+    "threshold": 0.55,
+    "min_dead_s": 4,
+    "min_live_s": 2
+   },
+   "post_grid": {
+    "threshold": [
+     0.35,
+     0.45,
+     0.55,
+     0.65
+    ],
+    "min_dead_s": [
+     2,
+     4,
+     8,
+     12
+    ],
+    "min_live_s": [
+     2,
+     4,
+     8,
+     12
+    ]
+   }
+  },
+  "restart_from_next_touch": true,
+  "snap": {
+   "snap": "first",
+   "snap_s": 1.0
+  },
+  "shape": {
+   "windows_s": [
+    1,
+    4,
+    12
+   ],
+   "side_window_s": 6,
+   "forward_step_s": 1.0,
+   "signals": [
+    "spread_x",
+    "spread_y",
+    "depth",
+    "forward"
+   ]
+  },
+  "override": {
+   "sure": 0.3,
+   "min_s": 4.0
+  },
+  "only_unseen": true
+ },
+ "seed": 0,
+ "who": "track-c agent",
+ "note": "v3.1 + long deflection window (1.0/1.5 s, off) only on touches with the ball unseen within +-W s or reappearance touches; 0.5 s elsewhere (Jordan's middle ground)",
+ "time": "2026-11-14T13:38:21",
+ "branch": "jordan/switch-confirm",
+ "commit": "d70cbd6d55b68062ebe3fcf307c33d2439937040",
+ "dirty": true,
+ "headline": 0.495300457942492,
+ "per_game": {
+  "1": 0.5210369782888866,
+  "2": 0.48593180808799075,
+  "3": 0.4789325874505985
+ },
+ "cells": {
+  "1": {
+   "reception": {
+    "20": {
+     "spell_f1": 0.5251908396946565,
+     "macro_f1": 0.8673779654506988,
+     "n_gt_spells": 317,
+     "n_pred_spells": 338,
+     "spell_f1_range": [
+      0.4879083969465649,
+      0.5638167938931297
+     ]
+    },
+    "35": {
+     "spell_f1": 0.5168831168831168,
+     "macro_f1": 0.8481690297575816,
+     "n_gt_spells": 317,
+     "n_pred_spells": 299,
+     "spell_f1_range": [
+      0.4752597402597402,
+      0.5539285714285714
+     ]
+    },
+    "50": {
+     "spell_f1": 0.47677419354838707,
+     "macro_f1": 0.8515876496958107,
+     "n_gt_spells": 317,
+     "n_pred_spells": 303
+    },
+    "clean": {
+     "spell_f1": 0.7112561174551386,
+     "macro_f1": 0.8755180714433467,
+     "n_gt_spells": 317,
+     "n_pred_spells": 296
+    }
+   },
+   "kick": {
+    "20": {
+     "spell_f1": 0.5042962962962962,
+     "macro_f1": 0.8536026773905058,
+     "n_gt_spells": 337,
+     "n_pred_spells": 338
+    },
+    "35": {
+     "spell_f1": 0.49371069182389943,
+     "macro_f1": 0.8377101789310499,
+     "n_gt_spells": 337,
+     "n_pred_spells": 299
+    },
+    "50": {
+     "spell_f1": 0.45999999999999996,
+     "macro_f1": 0.8381682050944009,
+     "n_gt_spells": 337,
+     "n_pred_spells": 303
+    },
+    "clean": {
+     "spell_f1": 0.7298578199052133,
+     "macro_f1": 0.8900430843743962,
+     "n_gt_spells": 337,
+     "n_pred_spells": 296
+    }
+   }
+  },
+  "2": {
+   "reception": {
+    "20": {
+     "spell_f1": 0.48882082695252677,
+     "macro_f1": 0.8463013757262378,
+     "n_gt_spells": 288,
+     "n_pred_spells": 365,
+     "spell_f1_range": [
+      0.4490045941807045,
+      0.5262787136294027
+     ]
+    },
+    "35": {
+     "spell_f1": 0.4830427892234548,
+     "macro_f1": 0.8374048397911472,
+     "n_gt_spells": 288,
+     "n_pred_spells": 343,
+     "spell_f1_range": [
+      0.44687797147385105,
+      0.5249128367670365
+     ]
+    },
+    "50": {
+     "spell_f1": 0.47389830508474573,
+     "macro_f1": 0.839773364565226,
+     "n_gt_spells": 288,
+     "n_pred_spells": 302
+    },
+    "clean": {
+     "spell_f1": 0.7536332179930796,
+     "macro_f1": 0.8862171468413407,
+     "n_gt_spells": 288,
+     "n_pred_spells": 290
+    }
+   },
+   "kick": {
+    "20": {
+     "spell_f1": 0.46785714285714297,
+     "macro_f1": 0.8377227031867985,
+     "n_gt_spells": 307,
+     "n_pred_spells": 365
+    },
+    "35": {
+     "spell_f1": 0.4584615384615384,
+     "macro_f1": 0.8297269154666358,
+     "n_gt_spells": 307,
+     "n_pred_spells": 343
+    },
+    "50": {
+     "spell_f1": 0.4584564860426929,
+     "macro_f1": 0.8275673454196522,
+     "n_gt_spells": 307,
+     "n_pred_spells": 302
+    },
+    "clean": {
+     "spell_f1": 0.7671691792294808,
+     "macro_f1": 0.9017467824309434,
+     "n_gt_spells": 307,
+     "n_pred_spells": 290
+    }
+   }
+  },
+  "3": {
+   "reception": {
+    "20": {
+     "spell_f1": 0.47546174142480213,
+     "macro_f1": 0.849292261943248,
+     "n_gt_spells": 364,
+     "n_pred_spells": 394,
+     "spell_f1_range": [
+      0.4410817941952506,
+      0.5103166226912929
+     ]
+    },
+    "35": {
+     "spell_f1": 0.4824034334763949,
+     "macro_f1": 0.8445178411176236,
+     "n_gt_spells": 364,
+     "n_pred_spells": 335,
+     "spell_f1_range": [
+      0.4451502145922747,
+      0.5264949928469242
+     ]
+    },
+    "50": {
+     "spell_f1": 0.46496240601503763,
+     "macro_f1": 0.8376607501724358,
+     "n_gt_spells": 364,
+     "n_pred_spells": 301
+    },
+    "clean": {
+     "spell_f1": 0.6947058823529411,
+     "macro_f1": 0.8676562833024614,
+     "n_gt_spells": 364,
+     "n_pred_spells": 316
+    }
+   },
+   "kick": {
+    "20": {
+     "spell_f1": 0.4594315245478036,
+     "macro_f1": 0.8390709096078286,
+     "n_gt_spells": 380,
+     "n_pred_spells": 394
+    },
+    "35": {
+     "spell_f1": 0.4648951048951049,
+     "macro_f1": 0.8326223317005272,
+     "n_gt_spells": 380,
+     "n_pred_spells": 335
+    },
+    "50": {
+     "spell_f1": 0.4499265785609398,
+     "macro_f1": 0.825999953819672,
+     "n_gt_spells": 380,
+     "n_pred_spells": 301
+    },
+    "clean": {
+     "spell_f1": 0.7132183908045977,
+     "macro_f1": 0.876326147854234,
+     "n_gt_spells": 380,
+     "n_pred_spells": 316
+    }
+   }
+  }
+ },
+ "keep_rule": {
+  "against": "20261113-195851_touch_dead_v3_shape_unseen_seed0.json",
+  "against_model": "touch_dead_v3_shape_unseen",
+  "headline_gain": 0.0042,
+  "drops_over_limit": {},
+  "keep": true
+ }
+}
