@@ -42,3 +42,4 @@
 20261114-140926_v3.1_long_deflection_unseen_live_seed0.json  # same, unseen counted only in predicted live play: +0.004 seed 0, -0.0004 seed 1, not kept (2026-11-14)
 20261114-151010_v3.1_long_deflection_unseen_live_seed1.json  # its seed-1 milestone, not kept (2026-11-14)
 20261114-135603_v4_proto_seed0.json  # v4 with an uncapped switch penalty: 0.577 but clean drops to -0.112, not kept (2026-11-14)
+20261114-173241_v4_proto_cap_more_seeds_seed0.json  # v4 trained on copy seeds 0+2+3: 0.558, +0.001 (a tie), not adopted (2026-11-14)
