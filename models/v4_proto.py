@@ -5,7 +5,9 @@ team-shape override where the ball is unseen. v4 keeps all of v3.1's signals but
 model weigh them frame by frame, then picks the most likely label sequence.
 
     1. Signals per frame (frame_features):
-         v3.1's own label; the dead-ball probability; the team-shape prior; whether the ball is
+         v3.1's own label; the dead-ball probability; the team-shape prior WHERE THE BALL IS
+         UNSEEN (with it everywhere, clean scores fell up to 0.105: v3.1's rule, Jordan
+         2026-11-14); whether the ball is
          seen, for how long it has been missing, and how long the gap is; the last and next touch
          (team, time since or until, and how clear it was: the gap between the nearest home and
          the nearest away player); the players' typical speed over 1 s.
@@ -51,10 +53,10 @@ DECODE_GRID = {
     "min_live": (1, 3, 5),                # blocks (0.2, 0.6, 1.0 s)
     "min_dead": (5, 10, 20),              # blocks (1, 2, 4 s)
 }
-SIGNED = ("v31_team", "prior", "prior_unseen", "v31_team_seen", "last_team", "last_team_recent",
+SIGNED = ("v31_team", "prior_unseen", "v31_team_seen", "last_team", "last_team_recent",
           "next_team", "next_team_soon", "last_margin", "next_margin")
 EVEN = ("v31_dead", "dead_logit", "dead_logit_2s", "dead_logit_8s", "seen", "since_seen",
-        "gap_len", "since_touch", "until_touch", "prior_abs", "last_clear", "next_clear",
+        "gap_len", "since_touch", "until_touch", "last_clear", "next_clear",
         "touch_strength", "speed_1s")
 LABELS = np.array(["H", "A", "D"])
 
@@ -140,14 +142,14 @@ def frame_features(tracking, base):
     speed = player_speeds_1s(tracking)
 
     signed = np.column_stack([
-        v31_team, prior, prior * ~seen, v31_team * seen,
+        v31_team, prior * ~seen, v31_team * seen,
         last_team, last_team * (since_t < 2.0), next_team, next_team * (until_t < 2.0),
         last_margin, next_margin])
     even = np.column_stack([
         (label == "D").astype(float), dead,
         rolling_mean(dead, FPS, FPS), rolling_mean(dead, 4 * FPS, 4 * FPS),
         seen.astype(float), np.log1p(since_seen), np.log1p(gap_len),
-        np.log1p(since_t), np.log1p(until_t), np.abs(prior),
+        np.log1p(since_t), np.log1p(until_t),
         np.abs(last_margin), np.abs(next_margin), pick(strength, last),
         np.nan_to_num(speed, nan=1.0)])
     return signed, even
