@@ -38,3 +38,7 @@
 20261113-223558_v3.1_confirm_switch_seed0.json  # physics-confirmed switches: 0.488 below v3.1, not kept (2026-11-13)
 20261114-135253_v3.1_seed0.json  # touch classifier adding weak switch touches: +0.004 on seed 0 but -0.006 on seed 1 (0.482 vs 0.488), not kept (Jordan, 2026-11-14); code stays on jordan/touch-clf as a possible v4 input
 20261114-143316_v3.1_seed1.json  # seed-1 milestone of the touch classifier: 0.482 vs v3.1's 0.488, not kept (Jordan, 2026-11-14)
+20261114-133825_v3.1_long_deflection_unseen_seed0.json  # long deflection where the ball is unseen: +0.004 on seed 0, not held on seed 1, not kept (2026-11-14)
+20261114-140926_v3.1_long_deflection_unseen_live_seed0.json  # same, unseen counted only in predicted live play: +0.004 seed 0, -0.0004 seed 1, not kept (2026-11-14)
+20261114-151010_v3.1_long_deflection_unseen_live_seed1.json  # its seed-1 milestone, not kept (2026-11-14)
+20261114-135603_v4_proto_seed0.json  # v4 with an uncapped switch penalty: 0.577 but clean drops to -0.112, not kept (2026-11-14)
