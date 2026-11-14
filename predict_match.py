@@ -32,7 +32,7 @@ from games import GAME, half_video_blocks, require, source_frames  # noqa: E402
 import score_external as se  # noqa: E402
 
 # Params
-DEFAULT_MODEL = "models.touch_dead:TouchDeadShapeUnseen"  # v3 + team shapes where the ball is unseen (0.491)
+DEFAULT_MODEL = "models.v4_proto:V4ProtoCap"  # v4 (0.557); v3.1 = models.touch_dead:TouchDeadShapeUnseen
 DEFAULT_OUT = os.path.join(ROOT, "evaluation", "results", "submission.csv")
 FIT_LEVELS = se.TUNING_LEVELS
 FIT_SEED = 0

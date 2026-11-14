@@ -11,14 +11,24 @@ from the provided tracking data only. Two parts, each fitted on other games:
 **Who has the ball: the last deliberate touch.** A touch is a sudden change in the ball's velocity
 with a player close by. Being near the ball isn't enough, because the tracking is 2D and a high
 ball passes "through" the players under it. Possession goes to the team that touched the ball
-last, with three refinements:
+last, with these refinements:
 
 - **Deflections:** a touch by the other team, followed by the original team touching again
   within 0.5 s, doesn't switch possession.
 - **Reappearing ball:** when the ball reappears after a tracking gap, the nearest player counts
   as touching it, because possession often changed while it was unseen.
+- **Long ball gaps:** when the ball reappears near the other team after a long gap, the switch is
+  moved back to when that team's centre started pushing toward the other goal faster than the
+  old team's.
 - **Restarts:** after a stoppage, the team comes from the first touch, not from the team that had
-  the ball before it.
+  the ball before it. The end of each stoppage is moved to the restart kick when one is detected
+  close by.
+
+**Where the ball is unseen: the team shapes.** A second model reads who has the ball from the
+players alone: the team in possession spreads out and pushes forward, the other narrows and drops
+back. It treats both teams the same, so it can't learn "the home team usually has it". On frames
+where the ball isn't tracked, it overrules the touches when it is sure enough for long enough.
+Where the ball is tracked, the touches always decide.
 
 **Whether the ball is in play: mostly the players.** In the provided match the ball is missing on
 41% of graded frames, often during live play, so "no ball" can't mean "dead ball". A logistic
@@ -28,8 +38,8 @@ regression estimates P(dead) from what the players do. It sees:
 - whether each team's shape is frozen;
 - players gathered for a wall or a corner;
 - a player standing at the touchline;
-- whether the ball is off the pitch or lying still, but only while the ball is visible. Whether
-  it is missing is never an input.
+- whether the ball is off the pitch or lying still (for 2 s or more, as when it is placed for a
+  set piece), but only while the ball is visible. Whether it is missing is never an input.
 
 Details are in the dead-ball section.
 
@@ -39,9 +49,9 @@ few thresholds are fitted on other games, transfers better across matches, and e
 be explained.
 
 Every number the models use is chosen in `fit()` on the external games, by trying a small grid
-and keeping the best score: the touch strength and radius, the measuring window, the dead-ball
-threshold and minimum run lengths. None is picked by hand, and none comes from the provided
-match.
+and keeping the best score: the touch strength and radius, the measuring window, the long-gap and
+restart settings, the dead-ball threshold and minimum run lengths, and how sure the team-shape
+model must be. None is picked by hand, and none comes from the provided match.
 
 ## 2. Assets used, and dropped
 
@@ -63,7 +73,16 @@ match.
 | A minimum hold time (2 s) before possession counts | Erases the real sub-second possessions the ground truth contains |
 | Hysteresis thresholds for dead runs | No gain |
 | Learned shifts of dead-run edges | No gain: timing errors fall both early and late |
-| Restart timing from detected kicks or touches | Not reliable on smoothed tracking |
+| A 0.8 s deflection window | Erases the sub-second possessions the ground truth counts; 0.5 s kept |
+| Touch goes to the player the ball moves away from | +0.006 on noisy copies, but clean tracking fell by up to 0.16: it only fitted our simulated blur |
+| Touch threshold relative to the match's own touch strengths | No change, including on a blurrier ball |
+| Team shapes overruling the touches everywhere | 0.527, but clean results fell by 0.056–0.077: it overruled correct touches |
+| Team shapes overruling only "doubtful" touches (crowd, just reappeared, weak) | 0.508, but clean fell by up to 0.086: doubtful touches are as common on clean tracking |
+| Team shapes overruling seen touches under a harm guard | 0.488, below the model kept |
+| Shorter minimum live run (1 s) | 0.486, below the model kept |
+| Longer deflection window (0.75 s, or up to 1.5 s) | A tie at 0.75 s; up to 1.5 s, clean fell by up to 0.069 |
+| Switches confirmed by the ball's movement | 0.488, below the model kept |
+| A learned classifier adding weak touches that switch possession | Not kept: +0.004 on seed 0, −0.006 on seed 1 |
 
 ## 3. Training data
 
@@ -93,7 +112,8 @@ so a model fitted on it learns shortcuts that fail there. We fit and score on no
   the air (long passes, crosses, keeper kicks) and in random gaps that start more often on slow
   balls, in crowds and near a goal.
 - **Players:** tracks are cut into anonymous slots per team.
-- **Ball position:** it is smoothed over about 0.8 s.
+- **Ball position:** it is smoothed over 0.84 s with a slow 0.1 m wobble. A ball shown in a
+  stoppage is carried to the restart spot and often lies still there before the restart.
 
 These settings copy summary statistics we measured on the provided tracking: gap counts and
 lengths, where gaps start, and the smoothing. The script that measures them,
@@ -104,19 +124,42 @@ chance would give (47% against 35%), so a good part of the 41% is dead ball, not
 **Validation.** Three rounds, each fitting on two games (20% and 35% copies) and scoring the
 third. We report the headline, the spellF1 averaged over 20% and 35% and over the three games,
 always with each game's own number. 50% and the kick-time labels are checks. A change is kept
-only if the headline rises and no single result drops by more than 0.02. A second noise seed is
-held back for milestone checks. [To update: a sealed test on open DFL/Bundesliga data (Bassek et
-al.), if run.]
+only if the headline rises, no single result drops by more than 0.02, and no result on the clean
+(noise-free) tracking drops by more than 0.05. That last guard stops changes that only fit our
+simulated noise. A second noise seed is held back for milestone checks.
 
-**Results on the external games** (seed 0; to update with the final model):
+**Results on the external games** (seed 0, current noisy copies):
 
 | Model | Headline (game 1 / 2 / 3) | macroF1 |
 |---|---|---|
-| Nearest team, "no ball = dead" | 0.131 | |
-| Nearest team, never dead | 0.165 | 0.38 |
-| Same + dead-ball detector | 0.196 (0.22 / 0.20 / 0.17) | 0.79 |
-| Last touch, never dead (v1) | 0.354 (0.35 / 0.34 / 0.37) | |
-| Last touch + dead-ball detector (v2) | **0.479 (0.51 / 0.47 / 0.46)** | about 0.83 |
+| Nearest team, "no ball = dead" | 0.122 (0.13 / 0.12 / 0.11) | 0.57 |
+| Nearest team, never dead | 0.150 (0.15 / 0.16 / 0.14) | 0.38 |
+| Last touch, never dead (v1) | 0.350 (0.34 / 0.35 / 0.36) | 0.42 |
+| Last touch + dead-ball detector and refinements (v3) | 0.479 (0.50 / 0.48 / 0.46) | 0.84 |
+| v3 + team shapes where the ball is unseen (v3.1) | **0.491 (0.51 / 0.48 / 0.48)**; seed 1: 0.488 | 0.85 |
+| v4 | [In progress] | |
+
+Each version was kept only after passing the rule above. Differences of a few thousandths are
+within noise: the scores move by about ±0.04 between bootstrap samples of a game.
+
+**Sealed check on other data.** As a test the models never saw, we scored them once on open
+DFL/Bundesliga games (Bassek et al.): v3 0.372, v3.1 0.390, and a two-tier variant 0.393. The
+order matches the Metrica results, so the gains carry over to another league and provider. The
+team-shape model picks the right team on 84% of in-play frames there (89% on Metrica).
+
+**Stress tests: extreme checks only.** We also scored each test game on copies with one noise
+setting deliberately wrong (`evaluation/stress_test.py`, `docs/stress_test_v2.md`). They are
+never used to choose anything. The player-noise ones are far beyond what the provided tracking
+shows: its player jitter is about 0.001 m, like Metrica's.
+
+| Variant (35% missing, model v3 before restart snapping) | Change |
+|---|---|
+| Player position wobble of 0.1 m per frame | −0.007 |
+| Player tracks broken twice as often / half as often | −0.010 / +0.001 |
+
+An earlier version measured player speed frame to frame and lost 0.071 under the wobble. Measuring
+it over 0.4 s cut that to 0.006, and we kept it as insurance. On the ball side, a blurrier ball
+(×1.5) costs 0.06 and missing 65% of the ball costs 0.11. Both degrade smoothly, with no collapse.
 
 ## 4. Possession rules
 
@@ -137,9 +180,10 @@ the video. Full reasoning and evidence are in `POSSESSION_RULES.md`.
 
 ## 5. Limitations
 
-- **Restart timing.** About half of our predicted restarts land within 1 s of the true moment
-  play resumes, on the external games. The smoothed tracking blurs the restart kick, and the
-  players start moving before the pass is received.
+- **Restart timing.** This is still our largest source of error on the external games: many
+  predicted restarts land more than 1 s from the true moment play resumes. The smoothed tracking
+  blurs the restart kick, and the players start moving before the pass is received. Moving each
+  restart to a detected kick helps, but only where the kick is visible.
 - **Short stoppages.** Stoppages of a few seconds, and quick restarts followed straight away by
   another whistle, are often missed or merged.
 - **Touches the tracking can't see.** These include headers and touches on a high ball, and
@@ -162,8 +206,8 @@ python external/metrica_labels.py                # labels for the external games
 python external/metrica_labels.py --restart kick
 python external/metrica_tracking.py              # their tracking
 python external/metrica_noise.py --calibration data/ball_gap_stats.json   # noisy copies
-python evaluation/score_external.py --model models.touch_dead:TouchDead   # external scores
-python predict_match.py --model models.touch_dead:TouchDead --out evaluation/results/[team].csv
+python evaluation/score_external.py --model models.touch_dead:TouchDeadShapeUnseen   # external scores (v3.1)
+python predict_match.py --model models.touch_dead:TouchDeadShapeUnseen --out evaluation/results/[team].csv
 ```
 
 `predict_match.py` fits on the three external games, reads the provided tracking (set

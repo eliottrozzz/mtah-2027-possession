@@ -1,10 +1,12 @@
-# Everything the evaluation needs. Deliberately two lines.
+# Everything the evaluation and our pipeline need. Deliberately short.
 #
-# The scorer is dependency-light on purpose: no sklearn, no torch, nothing that pins a Python
-# version. It runs under 3.8 and 3.11 alike and produces identical output, so "it scored
-# differently on my machine" is not a conversation anyone has to have.
+# The scorer is dependency-light on purpose: no sklearn, no torch. Our models, the external-data
+# scripts and predict_match.py import only numpy and pandas beyond the standard library.
+#
+# Versions are pinned to the environment our results were produced with (Python 3.9.6), so a
+# rerun gives the same numbers. These versions need Python 3.9 or later.
 #
 # Optional tooling -- the ATD loader and anything that opens the video -- lives in
 # requirements-starter.txt.
-numpy
-pandas
+numpy==2.0.2
+pandas==2.3.3
