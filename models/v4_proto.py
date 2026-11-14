@@ -48,11 +48,16 @@ CLIP_LOGIT = 6.0
 CAP_S = 10.0                  # times since / until are capped here
 BLOCK = 5                     # decoder block, frames (0.2 s)
 DECODE_GRID = {
-    "switch": (1.0, 2.0, 4.0, 8.0),       # H <-> A
+    "switch": (1.0, 2.0, 4.0, 8.0),       # H <-> A (stage 1: the same seen or unseen)
     "dead": (2.0, 4.0, 8.0),              # into or out of D
     "min_live": (1, 3, 5),                # blocks (0.2, 0.6, 1.0 s)
     "min_dead": (5, 10, 20),              # blocks (1, 2, 4 s)
 }
+# Stage 2: separate H <-> A penalties where the ball is seen and where it isn't, the rest fixed.
+# One penalty for both made the fit pick 4, which removed short possessions: noise in the copies,
+# real on clean tracking (clean down 0.112). A switch at a visible touch needs less evidence than
+# one hidden in a ball gap (Jordan, 2026-11-14).
+SWITCH_GRID = {"switch_seen": (0.5, 1.0, 2.0, 4.0), "switch_unseen": (1.0, 2.0, 4.0, 8.0)}
 SIGNED = ("v31_team", "prior_unseen", "v31_team_seen", "last_team", "last_team_recent",
           "next_team", "next_team_soon", "last_margin", "next_margin")
 EVEN = ("v31_dead", "dead_logit", "dead_logit_2s", "dead_logit_8s", "seen", "since_seen",
@@ -210,7 +215,7 @@ def log_proba(W, X):
 
 # -- decoder ------------------------------------------------------------------------------------
 
-def transition_matrix(params):
+def transition_matrix(params, switch=None):
     """Dense log-transition matrix over chained states: each label L has min_L sub-states that
     must be passed in order before L can be left. Returns (T, label of each state, entry state of
     each label)."""
@@ -229,14 +234,21 @@ def transition_matrix(params):
         for other in "HAD":
             if other == lab:
                 continue
-            cost = params["switch"] if {lab, other} == {"H", "A"} else params["dead"]
+            cost = (params["switch"] if switch is None else switch) if {lab, other} == {"H", "A"} \
+                else params["dead"]
             T[last[lab], entry[other]] = -cost
     return T, np.array(states), entry
 
 
-def viterbi(block_logp, params):
-    """Most likely block labels given (blocks, 3) log-probabilities of H, A, D."""
+def viterbi(block_logp, params, block_seen=None):
+    """Most likely block labels given (blocks, 3) log-probabilities of H, A, D. With block_seen,
+    an H <-> A switch into a block costs switch_seen where the ball is seen there and
+    switch_unseen where it isn't (if those are set; otherwise "switch" everywhere)."""
     T, states, entry = transition_matrix(params)
+    split = block_seen is not None and "switch_seen" in params
+    if split:
+        T_seen = transition_matrix(params, params["switch_seen"])[0]
+        T_unseen = transition_matrix(params, params["switch_unseen"])[0]
     col = {"H": 0, "A": 1, "D": 2}
     emit = block_logp[:, [col[s] for s in states]]              # (blocks, S)
     m = len(block_logp)
@@ -247,7 +259,7 @@ def viterbi(block_logp, params):
     score = score + emit[0]
     back = np.zeros((m, S), dtype=np.int32)
     for t in range(1, m):
-        cand = score[:, None] + T                               # (from, to)
+        cand = score[:, None] + ((T_seen if block_seen[t] else T_unseen) if split else T)
         back[t] = np.argmax(cand, axis=0)
         score = cand[back[t], np.arange(S)] + emit[t]
     path = np.empty(m, dtype=np.int32)
@@ -257,8 +269,9 @@ def viterbi(block_logp, params):
     return states[path]
 
 
-def decode(logp, period, params):
-    """Per-frame labels: Viterbi within each half on BLOCK-frame blocks; D outside the halves."""
+def decode(logp, period, params, seen=None):
+    """Per-frame labels: Viterbi within each half on BLOCK-frame blocks; D outside the halves.
+    seen: per-frame ball-seen flags (a block counts as seen if most of its frames are)."""
     n = len(logp)
     out = np.full(n, "D", dtype="<U1")
     for half in (1, 2):
@@ -270,7 +283,11 @@ def decode(logp, period, params):
         m = int(np.ceil(len(seg) / BLOCK))
         pad = np.full((m * BLOCK - len(seg), 3), np.nan)
         blocks = np.nanmean(np.concatenate([seg, pad]).reshape(m, BLOCK, 3), axis=1)
-        out[a:b] = np.repeat(viterbi(blocks, params), BLOCK)[:b - a]
+        block_seen = None
+        if seen is not None:
+            sv = np.concatenate([seen[a:b].astype(float), np.full(m * BLOCK - (b - a), np.nan)])
+            block_seen = np.nanmean(sv.reshape(m, BLOCK), axis=1) > 0.5
+        out[a:b] = np.repeat(viterbi(blocks, params, block_seen), BLOCK)[:b - a]
     return out
 
 
@@ -297,6 +314,7 @@ class V4Proto:
         return {"v31": self.v31.settings(), "scorer": {"signed": SIGNED, "even": EVEN, "l2": L2,
                 "fit_step": FIT_STEP, "weights": None if self.W is None else self.W.tolist()},
                 "decode": dict(self.decode_params or {}), "decode_grid": DECODE_GRID,
+                "switch_grid": SWITCH_GRID,
                 "block": BLOCK, "out_of_fold": True}
 
     def oof_bases(self, train):
@@ -333,18 +351,28 @@ class V4Proto:
 
     def fit_decoder(self, train, feats):
         logps = [log_proba(self.W, design(*f)) for f in feats]
+        seens = [np.isfinite(t["ball"][:, 0]) for t, _ in train]
+
+        def score(params):
+            return float(np.mean([
+                pm.evaluate(gt, pm.label_codes(decode(lp, t["period"], params, seen)))
+                ["spell_f1_mean"] for (t, gt), lp, seen in zip(train, logps, seens)]))
         best, best_score = None, -1.0
         for values in itertools.product(*DECODE_GRID.values()):
             params = dict(zip(DECODE_GRID.keys(), values))
-            score = float(np.mean([
-                pm.evaluate(gt, pm.label_codes(decode(lp, t["period"], params)))["spell_f1_mean"]
-                for (t, gt), lp in zip(train, logps)]))
-            if score > best_score:
-                best, best_score = params, score
+            value = score(params)
+            if value > best_score:
+                best, best_score = params, value
+        for values in itertools.product(*SWITCH_GRID.values()):
+            params = dict(best, **dict(zip(SWITCH_GRID.keys(), values)))
+            value = score(params)
+            if value > best_score:
+                best, best_score = params, value
         self.decode_params = best
         print("    v4 decode: {} (train spellF1 {:.3f})".format(best, best_score))
 
     def predict(self, tracking, base=None):
         base = base if base is not None else base_outputs(self.v31, tracking)
         logp = log_proba(self.W, design(*frame_features(tracking, base)))
-        return decode(logp, tracking["period"], self.decode_params)
+        return decode(logp, tracking["period"], self.decode_params,
+                      np.isfinite(tracking["ball"][:, 0]))
