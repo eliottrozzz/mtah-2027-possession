@@ -57,7 +57,13 @@ DECODE_GRID = {
 # One penalty for both made the fit pick 4, which removed short possessions: noise in the copies,
 # real on clean tracking (clean down 0.112). A switch at a visible touch needs less evidence than
 # one hidden in a ball gap (Jordan, 2026-11-14).
-SWITCH_GRID = {"switch_seen": (0.5, 1.0, 2.0, 4.0), "switch_unseen": (1.0, 2.0, 4.0, 8.0)}
+SWITCH_GRID = {"switch_cheap": (0.5, 1.0, 2.0, 4.0), "switch_other": (1.0, 2.0, 4.0, 8.0)}
+# Tried 2026-11-14: "cheap" = ball seen didn't fix clean (the fit still wanted 4 where seen: a
+# blurred ball makes short touches unreliable even when visible). V4ProtoTouch makes switches cheap
+# only near a CLEAR touch instead; V4ProtoCap caps the single penalty (Jordan: try both).
+TOUCH_SWITCH_GRID = {"clear_m": (1.0, 2.0), "switch_cheap": (0.5, 1.0, 2.0),
+                     "switch_other": (2.0, 4.0, 8.0)}
+CAP_DECODE_GRID = dict(DECODE_GRID, switch=(0.5, 1.0))
 SIGNED = ("v31_team", "prior_unseen", "v31_team_seen", "last_team", "last_team_recent",
           "next_team", "next_team_soon", "last_margin", "next_margin")
 EVEN = ("v31_dead", "dead_logit", "dead_logit_2s", "dead_logit_8s", "seen", "since_seen",
@@ -170,6 +176,20 @@ def player_speeds_1s(tracking):
         return per_half_scale(np.nanmedian(speed, axis=1), tracking["period"])
 
 
+def clear_touch_frames(tracking, base, clear_m):
+    """Per-frame flags: within BLOCK frames of a touch where one team's nearest player is at least
+    clear_m closer to the ball than the other team's."""
+    n = len(tracking["ball"])
+    flags = np.zeros(n, dtype=bool)
+    frames = np.asarray(base["touches"][0], dtype=int)
+    if not len(frames):
+        return flags
+    d_home, d_away = team_distances(tracking, frames)
+    for f in frames[np.abs(d_away - d_home) >= clear_m]:
+        flags[max(0, f - BLOCK):f + BLOCK + 1] = True
+    return flags
+
+
 # -- scorer -------------------------------------------------------------------------------------
 
 def design(signed, even, mirror=False):
@@ -240,15 +260,15 @@ def transition_matrix(params, switch=None):
     return T, np.array(states), entry
 
 
-def viterbi(block_logp, params, block_seen=None):
-    """Most likely block labels given (blocks, 3) log-probabilities of H, A, D. With block_seen,
-    an H <-> A switch into a block costs switch_seen where the ball is seen there and
-    switch_unseen where it isn't (if those are set; otherwise "switch" everywhere)."""
+def viterbi(block_logp, params, block_cheap=None):
+    """Most likely block labels given (blocks, 3) log-probabilities of H, A, D. With block_cheap,
+    an H <-> A switch into a block costs switch_cheap where the flag is set and switch_other where
+    it isn't (if those are set; otherwise "switch" everywhere)."""
     T, states, entry = transition_matrix(params)
-    split = block_seen is not None and "switch_seen" in params
+    split = block_cheap is not None and "switch_cheap" in params
     if split:
-        T_seen = transition_matrix(params, params["switch_seen"])[0]
-        T_unseen = transition_matrix(params, params["switch_unseen"])[0]
+        T_seen = transition_matrix(params, params["switch_cheap"])[0]
+        T_unseen = transition_matrix(params, params["switch_other"])[0]
     col = {"H": 0, "A": 1, "D": 2}
     emit = block_logp[:, [col[s] for s in states]]              # (blocks, S)
     m = len(block_logp)
@@ -259,7 +279,7 @@ def viterbi(block_logp, params, block_seen=None):
     score = score + emit[0]
     back = np.zeros((m, S), dtype=np.int32)
     for t in range(1, m):
-        cand = score[:, None] + ((T_seen if block_seen[t] else T_unseen) if split else T)
+        cand = score[:, None] + ((T_seen if block_cheap[t] else T_unseen) if split else T)
         back[t] = np.argmax(cand, axis=0)
         score = cand[back[t], np.arange(S)] + emit[t]
     path = np.empty(m, dtype=np.int32)
@@ -269,9 +289,9 @@ def viterbi(block_logp, params, block_seen=None):
     return states[path]
 
 
-def decode(logp, period, params, seen=None):
+def decode(logp, period, params, cheap=None):
     """Per-frame labels: Viterbi within each half on BLOCK-frame blocks; D outside the halves.
-    seen: per-frame ball-seen flags (a block counts as seen if most of its frames are)."""
+    cheap: per-frame flags where a switch is cheap (a block is cheap if any of its frames is)."""
     n = len(logp)
     out = np.full(n, "D", dtype="<U1")
     for half in (1, 2):
@@ -283,11 +303,11 @@ def decode(logp, period, params, seen=None):
         m = int(np.ceil(len(seg) / BLOCK))
         pad = np.full((m * BLOCK - len(seg), 3), np.nan)
         blocks = np.nanmean(np.concatenate([seg, pad]).reshape(m, BLOCK, 3), axis=1)
-        block_seen = None
-        if seen is not None:
-            sv = np.concatenate([seen[a:b].astype(float), np.full(m * BLOCK - (b - a), np.nan)])
-            block_seen = np.nanmean(sv.reshape(m, BLOCK), axis=1) > 0.5
-        out[a:b] = np.repeat(viterbi(blocks, params, block_seen), BLOCK)[:b - a]
+        block_cheap = None
+        if cheap is not None:
+            cv = np.concatenate([cheap[a:b], np.zeros(m * BLOCK - (b - a), dtype=bool)])
+            block_cheap = cv.reshape(m, BLOCK).any(axis=1)
+        out[a:b] = np.repeat(viterbi(blocks, params, block_cheap), BLOCK)[:b - a]
     return out
 
 
@@ -303,7 +323,11 @@ def group_by_game(train):
 
 
 class V4Proto:
+    """v4 with a separate switch penalty where the ball is seen (switch_mode "seen")."""
     name = "v4_proto"
+    switch_mode = "seen"
+    decode_grid = DECODE_GRID
+    switch_grid = SWITCH_GRID
 
     def __init__(self):
         self.v31 = TouchDeadShapeUnseen()
@@ -313,8 +337,8 @@ class V4Proto:
     def settings(self):
         return {"v31": self.v31.settings(), "scorer": {"signed": SIGNED, "even": EVEN, "l2": L2,
                 "fit_step": FIT_STEP, "weights": None if self.W is None else self.W.tolist()},
-                "decode": dict(self.decode_params or {}), "decode_grid": DECODE_GRID,
-                "switch_grid": SWITCH_GRID,
+                "decode": dict(self.decode_params or {}), "decode_grid": self.decode_grid,
+                "switch_grid": self.switch_grid, "switch_mode": self.switch_mode,
                 "block": BLOCK, "out_of_fold": True}
 
     def oof_bases(self, train):
@@ -336,7 +360,7 @@ class V4Proto:
         bases = bases if bases is not None else self.oof_bases(train)
         feats = [frame_features(t, b) for (t, _), b in zip(train, bases)]
         self.fit_scorer(train, feats)
-        self.fit_decoder(train, feats)
+        self.fit_decoder(train, feats, bases)
 
     def fit_scorer(self, train, feats):
         X, y = [], []
@@ -349,22 +373,30 @@ class V4Proto:
             y.append(np.select([target == 0, target == 1], [1, 0], 2))
         self.W = fit_multinomial(np.concatenate(X), np.concatenate(y))
 
-    def fit_decoder(self, train, feats):
+    def cheap_flags(self, tracking, base, params):
+        """Where a switch is cheap, for this model's switch_mode."""
+        if self.switch_mode == "seen":
+            return np.isfinite(tracking["ball"][:, 0])
+        if self.switch_mode == "touch" and "clear_m" in params:
+            return clear_touch_frames(tracking, base, params["clear_m"])
+        return None
+
+    def fit_decoder(self, train, feats, bases):
         logps = [log_proba(self.W, design(*f)) for f in feats]
-        seens = [np.isfinite(t["ball"][:, 0]) for t, _ in train]
 
         def score(params):
             return float(np.mean([
-                pm.evaluate(gt, pm.label_codes(decode(lp, t["period"], params, seen)))
-                ["spell_f1_mean"] for (t, gt), lp, seen in zip(train, logps, seens)]))
+                pm.evaluate(gt, pm.label_codes(decode(lp, t["period"], params,
+                                                      self.cheap_flags(t, b, params))))
+                ["spell_f1_mean"] for (t, gt), lp, b in zip(train, logps, bases)]))
         best, best_score = None, -1.0
-        for values in itertools.product(*DECODE_GRID.values()):
-            params = dict(zip(DECODE_GRID.keys(), values))
+        for values in itertools.product(*self.decode_grid.values()):
+            params = dict(zip(self.decode_grid.keys(), values))
             value = score(params)
             if value > best_score:
                 best, best_score = params, value
-        for values in itertools.product(*SWITCH_GRID.values()):
-            params = dict(best, **dict(zip(SWITCH_GRID.keys(), values)))
+        for values in itertools.product(*self.switch_grid.values()):
+            params = dict(best, **dict(zip(self.switch_grid.keys(), values)))
             value = score(params)
             if value > best_score:
                 best, best_score = params, value
@@ -375,4 +407,19 @@ class V4Proto:
         base = base if base is not None else base_outputs(self.v31, tracking)
         logp = log_proba(self.W, design(*frame_features(tracking, base)))
         return decode(logp, tracking["period"], self.decode_params,
-                      np.isfinite(tracking["ball"][:, 0]))
+                      self.cheap_flags(tracking, base, self.decode_params))
+
+
+class V4ProtoTouch(V4Proto):
+    """Switches cheap only within 0.2 s of a clear touch (one team clearly nearest)."""
+    name = "v4_proto_touch"
+    switch_mode = "touch"
+    switch_grid = TOUCH_SWITCH_GRID
+
+
+class V4ProtoCap(V4Proto):
+    """One switch penalty, capped at 1 (no separate cheap/other penalties)."""
+    name = "v4_proto_cap"
+    switch_mode = "single"
+    decode_grid = CAP_DECODE_GRID
+    switch_grid = {}
