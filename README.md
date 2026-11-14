@@ -161,6 +161,24 @@ The notebooks additionally want `kloppy` and `matplotlib` (`requirements-starter
 
 ---
 
+## Reproduce our submission
+
+Python 3.9 or later. Fit and score on the external (Metrica) games, then predict the match:
+
+```bash
+python3 -m venv .venv && source .venv/bin/activate
+pip install -r requirements.txt -r requirements-starter.txt
+python external/metrica_labels.py
+python external/metrica_labels.py --restart kick
+python external/metrica_tracking.py
+python external/metrica_noise.py --calibration data/ball_gap_stats.json
+python evaluation/score_external.py --model models.touch_dead:TouchDeadShapeUnseen
+MTAH_DATA_DIR=/path/to/data/bundle python predict_match.py --out evaluation/results/submission.csv
+```
+
+`predict_match.py` uses the current model by default and runs the official format check. Details
+are in `docs/technical_document.md`.
+
 ## Timeline
 
 | |                |
