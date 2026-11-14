@@ -82,7 +82,7 @@ model must be. None is picked by hand, and none comes from the provided match.
 | Shorter minimum live run (1 s) | 0.486, below the model kept |
 | Longer deflection window (0.75 s, or up to 1.5 s) | A tie at 0.75 s; up to 1.5 s, clean fell by up to 0.069 |
 | Switches confirmed by the ball's movement | 0.488, below the model kept |
-| A learned classifier adding weak touches that switch possession | +0.004 on seed 0 but −0.006 on seed 1: within noise. [To confirm: not kept] |
+| A learned classifier adding weak touches that switch possession | Not kept: +0.004 on seed 0, −0.006 on seed 1 |
 
 ## 3. Training data
 
@@ -112,7 +112,8 @@ so a model fitted on it learns shortcuts that fail there. We fit and score on no
   the air (long passes, crosses, keeper kicks) and in random gaps that start more often on slow
   balls, in crowds and near a goal.
 - **Players:** tracks are cut into anonymous slots per team.
-- **Ball position:** it is smoothed over about 0.8 s.
+- **Ball position:** it is smoothed over 0.84 s with a slow 0.1 m wobble. A ball shown in a
+  stoppage is carried to the restart spot and often lies still there before the restart.
 
 These settings copy summary statistics we measured on the provided tracking: gap counts and
 lengths, where gaps start, and the smoothing. The script that measures them,
@@ -144,7 +145,7 @@ within noise: the scores move by about ±0.04 between bootstrap samples of a gam
 **Sealed check on other data.** As a test the models never saw, we scored them once on open
 DFL/Bundesliga games (Bassek et al.): v3 0.372, v3.1 0.390, and a two-tier variant 0.393. The
 order matches the Metrica results, so the gains carry over to another league and provider. The
-team-shape model picks the right team on 84% of frames there, against 89% on Metrica.
+team-shape model picks the right team on 84% of in-play frames there (89% on Metrica).
 
 **Stress tests: extreme checks only.** We also scored each test game on copies with one noise
 setting deliberately wrong (`evaluation/stress_test.py`, `docs/stress_test_v2.md`). They are
