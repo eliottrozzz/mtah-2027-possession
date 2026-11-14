@@ -93,6 +93,95 @@ def carry_every_stoppage_frame(data, labels, rng):
     data["ball"] = ball
 
 
+# -- player-tracking error, added on top of the STORED copies (no calibration file needed) --------
+#
+# The copies cut tracks, drop players briefly and swap close players within a team, with a tiny
+# per-frame jitter. Real optical tracking also has slow position error and identity swaps in duels,
+# which can cross teams. Sizes from public validation work, not from the provided match:
+#   * Modern multi-camera optical systems measure about 0.1 m RMSE against a reference system
+#     (e.g. Linke, Link & Lames 2020, PLoS ONE, on TRACAB); single-camera or broadcast-based
+#     tracking is markedly worse, around a metre, and worse far from the camera. Drift 0.3 and
+#     0.5 m stand for a mid-range system, 1.0 m for broadcast-like tracking. The error is slow
+#     (smoothed over about a second), as a tracker smooths its own output.
+#   * Dropouts: players lost for 1-3 s in crowds or at the image edge, once a minute on top of the
+#     copies' own (twice a minute in the harsh variant).
+#   * Swaps across teams: when an opponent comes within 1.5 m, a fifth of such encounters swap the
+#     two players' positions for 0.5-2 s (two fifths in the harsh variant).
+PLAYER_SMOOTH_FRAMES = 25          # 1 s
+SWAP_CLOSE_M = 1.5
+SWAP_CHECK_FRAMES = 5
+
+
+def player_drift(data, rng, metres_sd):
+    """Slow position error, about metres_sd, independent per slot."""
+    players = data["players"]
+    for slot in range(players.shape[1]):
+        players[:, slot] += mn.slow_wobble(len(players), PLAYER_SMOOTH_FRAMES, metres_sd, rng)
+
+
+def player_dropouts(data, rng, per_minute, seconds=(1.0, 3.0)):
+    """Each slot goes missing for 1-3 s, per_minute times a minute while it is tracked."""
+    players = data["players"]
+    n = len(players)
+    for slot in range(players.shape[1]):
+        present = np.isfinite(players[:, slot, 0])
+        for frame in np.flatnonzero(present & (rng.random(n) < per_minute / (60.0 * mn.FPS))):
+            players[frame:frame + int(rng.uniform(*seconds) * mn.FPS), slot] = np.nan
+
+
+def cross_team_swaps(data, rng, prob, seconds=(0.5, 2.0)):
+    """When a home and an away slot come within SWAP_CLOSE_M, swap their positions for 0.5-2 s
+    with probability prob (once per encounter)."""
+    players, team = data["players"], data["team"]
+    home, away = np.flatnonzero(team == "H"), np.flatnonzero(team == "A")
+    pitch = np.array(mn.mt.PITCH, dtype=np.float32)
+    was_close, busy_until = set(), 0
+    for frame in range(0, len(players), SWAP_CHECK_FRAMES):
+        h, a = players[frame, home] * pitch, players[frame, away] * pitch
+        dist = np.hypot(h[:, None, 0] - a[None, :, 0], h[:, None, 1] - a[None, :, 1])
+        close = set(zip(*np.nonzero(dist < SWAP_CLOSE_M)))              # NaN compares False
+        for i, j in close - was_close:
+            if frame >= busy_until and rng.random() < prob:
+                stop = frame + int(rng.uniform(*seconds) * mn.FPS)
+                si, sj = home[i], away[j]
+                players[frame:stop, [si, sj]] = players[frame:stop, [sj, si]]
+                busy_until = stop
+        was_close = close
+
+
+def player_noise(drift_m=0.0, dropouts_per_minute=0.0, swap_prob=0.0):
+    def edit(data, rng):
+        if drift_m:
+            player_drift(data, rng, drift_m)
+        if dropouts_per_minute:
+            player_dropouts(data, rng, dropouts_per_minute)
+        if swap_prob:
+            cross_team_swaps(data, rng, swap_prob)
+    return edit
+
+
+def player_variants():
+    """name -> (description, edit of a stored copy). Applied on top of the stored copies."""
+    return {
+        "players_as_scored": ("stored copy, no extra player error", player_noise()),
+        "players_drift0.3": ("player drift 0.3 m (slow)", player_noise(drift_m=0.3)),
+        "players_drift0.5": ("player drift 0.5 m (slow)", player_noise(drift_m=0.5)),
+        "players_dropouts": ("players lost 1-3 s, once a minute", player_noise(dropouts_per_minute=1)),
+        "players_swaps": ("cross-team swaps in duels (20%)", player_noise(swap_prob=0.2)),
+        "players_all": ("drift 0.5 m + dropouts + swaps", player_noise(0.5, 1, 0.2)),
+        "players_harsh": ("drift 1 m + dropouts x2 + swaps 40%", player_noise(1.0, 2, 0.4)),
+    }
+
+
+def player_variant_copy(name, game, level, seed=SEED):
+    """A stored copy with the named player error added (reproducible per game, level, seed)."""
+    data = {k: v.copy() for k, v in se.load_tracking(game, level, seed).items()}
+    names = list(player_variants())
+    rng = np.random.default_rng([game, level, seed, 2, names.index(name)])
+    player_variants()[name][1](data, rng)
+    return data
+
+
 def same_tracking(a, b):
     return all(np.array_equal(a[k], b[k], equal_nan=a[k].dtype.kind == "f") for k in b)
 
@@ -100,15 +189,22 @@ def same_tracking(a, b):
 def main():
     parser = argparse.ArgumentParser(description=__doc__.split("\n")[0])
     parser.add_argument("--model", required=True, help="module:Class")
-    parser.add_argument("--variants", nargs="+", help="names to run (default: all)")
+    parser.add_argument("--variants", nargs="+",
+                        help="names to run (default: all rebuilt variants; players_* variants "
+                             "add player error to the stored copies)")
+    parser.add_argument("--levels", nargs="+", type=int, default=[LEVEL],
+                        help="live levels for the players_* variants (default 35)")
     args = parser.parse_args()
     warnings.simplefilter("ignore", RuntimeWarning)
 
-    mn.calibrate(CALIBRATION)
+    players_table = player_variants()
+    rebuilt = [n for n in (args.variants or []) if n not in players_table]
+    if args.variants is None or rebuilt:
+        mn.calibrate(CALIBRATION)
     base = {k: copy.deepcopy(getattr(mn, k)) for k in SETTINGS}
     table = variants(base)
     names = args.variants or list(table)
-    unknown = [n for n in names if n not in table]
+    unknown = [n for n in names if n not in table and n not in players_table]
     if unknown:
         parser.error("unknown variants {}; have {}".format(unknown, list(table)))
 
@@ -130,7 +226,18 @@ def main():
     print("\n{:<42}{:>8}  {:<20}{:>8}".format("variant (live{})".format(LEVEL), "spellF1",
                                                 "game 1 / 2 / 3", "macroF1"))
     reference = None
-    for name in names:
+    for name in [n for n in names if n in players_table]:
+        for level in args.levels:
+            spell, macro = [], []
+            for test in se.GAMES:
+                data = player_variant_copy(name, test, level)
+                result = pm.evaluate(keys[test], pm.label_codes(models[test].predict(data)))
+                spell.append(result["spell_f1_mean"])
+                macro.append(result["macro_f1"])
+            print("{:<42}{:>8.3f}  {:<20}{:>8.3f}".format(
+                "{} (live{})".format(players_table[name][0], level), float(np.mean(spell)),
+                " / ".join("{:.2f}".format(s) for s in spell), float(np.mean(macro))), flush=True)
+    for name in [n for n in names if n not in players_table]:
         description, change, level, *edit = table[name]
         for key, value in base.items():
             setattr(mn, key, copy.deepcopy(value))
