@@ -27,7 +27,7 @@ import numpy as np
 
 from models.dead_ball import DeadBallDetector
 from models.team_shape import TeamShapePrior
-from models.touch import FPS, LastTouch, all_touches
+from models.touch import FPS, LastTouch
 
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
                                 "evaluation"))
@@ -59,11 +59,16 @@ class TouchDead:
                 "restart_from_next_touch": self.restart_from_next_touch, "snap": dict(self.snap)}
 
     def touches(self, tracking):
-        return all_touches(tracking, self.touch.params)
+        return self.touch.touches(tracking)
 
     def fit(self, train):
         self.touch.fit(train)
         self.detector.fit(train, base_predict=self.touch.predict)
+        if self.touch.defer_long:
+            # Long deflection window with stoppage gaps masked by our own detector. The detector
+            # stays as fitted on the touch labels without the long window.
+            self.touch.dead_fn = self.detector.dead_mask
+            self.touch.fit_long(train)
         # The snap is tuned last, on top of everything else; the expensive parts run once.
         parts = [(self.touch.predict(tr), self.detector.dead_mask(tr), self.touches(tr), gt)
                  for tr, gt in train]
@@ -255,3 +260,20 @@ class TouchDeadShapeUnseenLongDeflection(TouchDeadShapeUnseen):
             {"long_deflection_s": 1.0, "long_unseen_w": 1.0},
             {"long_deflection_s": 1.5, "long_unseen_w": 0.5},
             {"long_deflection_s": 1.5, "long_unseen_w": 1.0}))
+
+
+class TouchDeadShapeUnseenLongDeflectionLive(TouchDeadShapeUnseenLongDeflection):
+    """As v3.1_long_deflection_unseen, but unseen frames count only where the model's own dead-ball
+    detector predicts live play, so stoppage gaps don't make restart touches doubtful (Jordan,
+    2026-11-14). Never the key."""
+    name = "v3.1_long_deflection_unseen_live"
+
+    def __init__(self):
+        super().__init__()
+        self.touch = LastTouch(long_deflection_candidates=(
+            {"long_deflection_s": 0.0},
+            {"long_deflection_s": 1.0, "long_unseen_w": 0.5, "long_where": "live"},
+            {"long_deflection_s": 1.0, "long_unseen_w": 1.0, "long_where": "live"},
+            {"long_deflection_s": 1.5, "long_unseen_w": 0.5, "long_where": "live"},
+            {"long_deflection_s": 1.5, "long_unseen_w": 1.0, "long_where": "live"}))
+        self.touch.defer_long = True

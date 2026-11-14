@@ -92,12 +92,15 @@ CONFIRM_STEADY = 0.7            # share of frames the distance must grow on
 # or that is a reappearance (or gap switch) touch, gets long_deflection_s instead of deflection_s.
 # Clearly tracked touches keep the 0.5 s rule and the 0.75 s cap. Physics and visibility only,
 # never "who touches next". Fitted after the deflection stage; "off" is a candidate.
+# long_where "live" (Jordan, 2026-11-14): count unseen frames only where the model itself predicts
+# live play (its dead-ball detector, never the key), so a stoppage gap doesn't make the restart
+# touch doubtful. Needs a dead mask: TouchDead fits this stage after its detector (defer_long).
 LONG_DEFLECTION_CANDIDATES = ({"long_deflection_s": 0.0},)
 ADVANCE_STEP_S = 1.0            # team centre velocity measured over this long
 ADVANCE_SMOOTH_S = 2.0          # then averaged over this long
 STRENGTH_QUANTILE = 0.9
 DEFAULTS = {"min_strength": 2.0, "min_strength_rel": None, "radius_m": 2.5, "window": 8, "assign": "at",
-            "deflection_s": 0.5, "reappear_s": 0.0, "long_deflection_s": 0.0, "long_unseen_w": 0.5,
+            "deflection_s": 0.5, "reappear_s": 0.0, "long_deflection_s": 0.0, "long_unseen_w": 0.5, "long_where": "all",
             "leave_m": 0.0, "gap_rule": "off"}
 AFTER_FRAMES = 12               # "after": how long the toucher should stay near the ball (0.48 s)
 
@@ -293,8 +296,9 @@ def strength_threshold(tracking, params):
     return rel * float(np.quantile(strength, STRENGTH_QUANTILE)) if len(strength) else np.inf
 
 
-def all_touches(tracking, params):
-    """Touches, plus reappearances if switched on, in time order, with deflections dropped."""
+def all_touches(tracking, params, dead=None):
+    """Touches, plus reappearances if switched on, in time order, with deflections dropped.
+    dead: the model's own dead-ball mask, used only by long_where "live"."""
     frames, teams = find_touches(tracking, strength_threshold(tracking, params),
                                  params["radius_m"],
                                  params["window"], params.get("assign", "at"),
@@ -314,12 +318,17 @@ def all_touches(tracking, params):
         from_gap = np.concatenate((from_gap, np.ones(len(re_frames), dtype=bool)))
         order = np.argsort(frames, kind="stable")
         frames, teams, from_gap = frames[order], teams[order], from_gap[order]
-    return drop_deflections(frames, teams, deflection_windows(tracking, frames, from_gap, params))
+    return drop_deflections(frames, teams,
+                            deflection_windows(tracking, frames, from_gap, params, dead))
 
 
-def doubtful_touches(tracking, frames, from_gap, w_s):
-    """True for touches whose ball is unseen anywhere within +-w_s s, or that come from a gap."""
-    missing = np.isnan(tracking["ball"][:, 0]).astype(np.int32)
+def doubtful_touches(tracking, frames, from_gap, w_s, dead=None):
+    """True for touches whose ball is unseen anywhere within +-w_s s, or that come from a gap.
+    With a dead mask, unseen frames inside predicted stoppages don't count."""
+    missing = np.isnan(tracking["ball"][:, 0])
+    if dead is not None:
+        missing = missing & ~dead
+    missing = missing.astype(np.int32)
     w = int(round(w_s * FPS))
     cum = np.concatenate(([0], np.cumsum(missing)))
     lo = np.clip(frames - w, 0, len(missing))
@@ -327,14 +336,19 @@ def doubtful_touches(tracking, frames, from_gap, w_s):
     return from_gap | (cum[hi] - cum[lo] > 0)
 
 
-def deflection_windows(tracking, frames, from_gap, params):
+def deflection_windows(tracking, frames, from_gap, params, dead=None):
     """Per-touch deflection window in frames (see LONG_DEFLECTION_CANDIDATES)."""
     short = int(params["deflection_s"] * FPS)
     windows = np.full(len(frames), short, dtype=int)
     long_s = params.get("long_deflection_s", 0.0)
     if long_s > 0 and len(frames):
+        if params.get("long_where", "all") == "live":
+            if dead is None:
+                raise ValueError('long_where "live" needs the dead mask (see LastTouch.dead_fn)')
+        else:
+            dead = None
         doubt = doubtful_touches(tracking, np.asarray(frames, dtype=int), from_gap,
-                                 params["long_unseen_w"])
+                                 params["long_unseen_w"], dead)
         windows[doubt] = max(short, int(long_s * FPS))
     return windows
 
@@ -426,13 +440,22 @@ class LastTouch:
         self.params = dict(DEFAULTS, **params)
         self.deflection_candidates = tuple(deflection_candidates)
         self.long_deflection_candidates = tuple(long_deflection_candidates)
+        self.defer_long = False     # True: fit() skips the long stage; the owner calls fit_long
+        self.dead_fn = None         # tracking -> the owner's dead-ball mask (long_where "live")
         self.confirm_candidates = tuple(confirm_candidates)
 
     def settings(self):
         return dict(self.params)
 
-    def predict_with(self, tracking, params):
-        frames, teams = all_touches(tracking, params)
+    def touches(self, tracking, params=None, dead=None):
+        params = self.params if params is None else params
+        if dead is None and params.get("long_where", "all") == "live" \
+                and params.get("long_deflection_s", 0.0) > 0:
+            dead = self.dead_fn(tracking)
+        return all_touches(tracking, params, dead)
+
+    def predict_with(self, tracking, params, dead=None):
+        frames, teams = self.touches(tracking, params, dead)
         labels = possession_from_touches(len(tracking["ball"]), frames, teams)
         labels[tracking["period"] == 0] = "D"
         return labels
@@ -467,13 +490,14 @@ class LastTouch:
             if value > best_score:
                 best, best_score = params, value
         base = best
-        for long in self.long_deflection_candidates:
-            if long.get("long_deflection_s", 0.0) <= 0:
-                continue                              # base is already "off"
-            params = dict(base, **long)
-            value = score(params)
-            if value > best_score:
-                best, best_score = params, value
+        if not self.defer_long:
+            for long in self.long_deflection_candidates:
+                if long.get("long_deflection_s", 0.0) <= 0:
+                    continue                          # base is already "off"
+                params = dict(base, **long)
+                value = score(params)
+                if value > best_score:
+                    best, best_score = params, value
         base = best
         for confirm in self.confirm_candidates:
             if confirm.get("confirm", "off") == "off":
@@ -484,3 +508,23 @@ class LastTouch:
                 best, best_score = params, value
         self.params = best
         print("    fit: {} (train spellF1 {:.3f})".format(best, best_score))
+
+    def fit_long(self, train):
+        """The long-deflection stage on its own, everything else fixed (see defer_long)."""
+        deads = [self.dead_fn(tracking) for tracking, _ in train]
+
+        def score(params):
+            return float(np.mean([pm.evaluate(gt, pm.label_codes(
+                self.predict_with(tracking, params, dead)))["spell_f1_mean"]
+                for (tracking, gt), dead in zip(train, deads)]))
+        best, best_score = self.params, score(self.params)
+        for long in self.long_deflection_candidates:
+            if long.get("long_deflection_s", 0.0) <= 0:
+                continue
+            params = dict(self.params, **long)
+            value = score(params)
+            if value > best_score:
+                best, best_score = params, value
+        self.params = best
+        print("    long deflection: {} (train spellF1 {:.3f})".format(
+            {k: best[k] for k in ("long_deflection_s", "long_unseen_w", "long_where")}, best_score))
