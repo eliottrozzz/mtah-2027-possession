@@ -43,3 +43,5 @@
 20261114-151010_v3.1_long_deflection_unseen_live_seed1.json  # its seed-1 milestone, not kept (2026-11-14)
 20261114-135603_v4_proto_seed0.json  # v4 with an uncapped switch penalty: 0.577 but clean drops to -0.112, not kept (2026-11-14)
 20261114-173241_v4_proto_cap_more_seeds_seed0.json  # v4 trained on copy seeds 0+2+3: 0.558, +0.001 (a tie), not adopted (2026-11-14)
+20261115-162216_v4_dfl_seed0.json  # v4 + 4 DFL TRAIN matches: +0.004 on seed 0, -0.002 on seed 1; not adopted as the bar (2026-11-15)
+20261115-173946_v4_dfl_seed1.json  # its seed-1 milestone (2026-11-15)
