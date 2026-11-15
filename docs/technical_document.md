@@ -170,7 +170,7 @@ simulated noise. A second noise seed is held back for milestone checks.
 | Last touch, never dead (v1) | 0.350 (0.34 / 0.35 / 0.36) | 0.42 |
 | Last touch + dead-ball detector and refinements (v3) | 0.479 (0.50 / 0.48 / 0.46) | 0.84 |
 | v3 + team shapes where the ball is unseen (v3.1) | 0.491 (0.51 / 0.48 / 0.48); seed 1: 0.488 | 0.85 |
-| v3.1 signals + per-frame scorer + decoder (v4) | **0.557 (0.57 / 0.57 / 0.53)**; seed 1: 0.550 | |
+| v3.1 signals + per-frame scorer + decoder (v4) | **0.557 (0.57 / 0.57 / 0.53)**; seed 1: 0.550 | 0.87 |
 
 Each version was kept only after passing the rule above. Differences of a few thousandths are
 within noise: the scores move by about ±0.04 between bootstrap samples of a game.
