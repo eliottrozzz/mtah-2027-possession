@@ -254,7 +254,9 @@ the video. Full reasoning and evidence are in `POSSESSION_RULES.md`.
 
 ```bash
 python3 -m venv .venv && source .venv/bin/activate
-pip install -r requirements.txt -r requirements-starter.txt
+pip install -r requirements.txt                  # numpy and pandas only
+export MTAH_DATA_DIR=/path/to/data/bundle
+python external/measure_ball_gaps.py             # data/ball_gap_stats.json (aggregates only)
 python external/metrica_labels.py                # labels for the external games
 python external/metrica_labels.py --restart kick
 python external/metrica_tracking.py              # their tracking
@@ -265,7 +267,9 @@ python predict_match.py --model models.v4_proto:V4ProtoCap --out evaluation/resu
 
 v3.1 is our fallback: pass `--model models.touch_dead:TouchDeadShapeUnseen` to either command.
 
-`predict_match.py` fits on the three external games, reads the provided tracking (set
-`MTAH_DATA_DIR` to the data bundle), writes one label per video frame and runs the official
+`measure_ball_gaps.py` measures how the provided tracking loses the ball and saves only summary
+numbers, which `metrica_noise.py` copies onto the external games; the file is not committed, so it
+is regenerated from the bundle. `predict_match.py` fits on the three external games, reads the
+provided tracking (from `MTAH_DATA_DIR`), writes one label per video frame and runs the official
 format check. Fitting is deterministic: two fits give identical settings and identical
 predictions.
