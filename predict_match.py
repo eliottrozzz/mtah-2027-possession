@@ -144,6 +144,8 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__.split("\n")[0])
     parser.add_argument("--model", default=DEFAULT_MODEL)
     parser.add_argument("--out", default=DEFAULT_OUT)
+    parser.add_argument("--no-tags", action="store_true",
+                        help="don't pass the Smart Tagging set pieces to the model")
     args = parser.parse_args()
 
     module, _, attr = args.model.partition(":")
@@ -173,6 +175,18 @@ def main():
     outside = tracking["period"] == 0
     tracking["ball"][outside] = np.nan
     tracking["players"][outside] = np.nan
+
+    # Smart Tagging set pieces (v5 input; v4 and earlier ignore the key). Tags are in video
+    # frames, and the tracking rows are video frames, so they go in unchanged. --no-tags runs a
+    # tag-using model without them (it then falls back to v4's behaviour).
+    if not args.no_tags:
+        sys.path.insert(0, os.path.join(ROOT, "external"))
+        import smart_tagging  # noqa: E402
+        set_pieces = smart_tagging.read_set_pieces(smart_tagging.default_path())
+        n = len(tracking["period"])
+        tracking["set_pieces"] = [t for t in set_pieces if 0 <= t["start_frame"] < n]
+        print("  set-piece tags: {} ({} with a team)".format(
+            len(tracking["set_pieces"]), sum(t["team"] is not None for t in tracking["set_pieces"])))
 
     labels = np.asarray(model.predict(tracking), dtype="<U1")
     labels = np.where(tracking["period"] > 0, labels, "X")
