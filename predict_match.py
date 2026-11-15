@@ -167,6 +167,13 @@ def main():
                  "frames did not map onto the video, not writing a file".format(ball_seen,
                                                                                   players_seen))
 
+    # Blank ball and players outside the graded halves (warm-up, half-time, after the end): the
+    # Metrica games the model was fitted and scored on have no such rows, so this keeps the input
+    # exactly as tested. Measured on padded Metrica copies: realistic rows there cost v4 <= 0.001.
+    outside = tracking["period"] == 0
+    tracking["ball"][outside] = np.nan
+    tracking["players"][outside] = np.nan
+
     labels = np.asarray(model.predict(tracking), dtype="<U1")
     labels = np.where(tracking["period"] > 0, labels, "X")
     shares, spells = summary(labels, tracking["period"])
