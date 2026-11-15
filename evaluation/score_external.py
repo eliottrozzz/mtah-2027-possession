@@ -34,6 +34,7 @@ import importlib
 import io
 import json
 import os
+import re
 import subprocess
 import sys
 
@@ -59,6 +60,7 @@ CLEAN_MAX_DROP = 0.05                 # ... and on any clean result: a change th
                                       # noisy copies may be fitting our noise model, not football
 BOOTSTRAP_N = 200                     # for the headline cells only
 RUNS_DIR = os.path.join(ROOT, "results", "runs")
+VERSIONS_DOC = os.path.join(ROOT, "docs", "model_versions.md")
 LABEL_PATH = os.path.join(mt.OUT_DIR, "game{}_labels_{}.csv")
 NOISY_PATH = os.path.join(mt.OUT_DIR, "noisy", "game{}_live{}_seed{}.npz")
 
@@ -220,6 +222,23 @@ def cells_from_log(entry):
     return {int(g): v for g, v in entry["cells"].items()}
 
 
+def version_name(run_name):
+    """A run's model name as its version (v3.1, v4, ...) from docs/model_versions.md's table, so a
+    run logged under an old name (e.g. v4_proto_cap) shows as the version it became. Names that
+    never became a version come back unchanged."""
+    try:
+        with open(VERSIONS_DOC) as handle:
+            for line in handle:
+                cols = [c.strip() for c in line.strip().strip("|").split("|")]
+                if len(cols) < 3 or not cols[0].lstrip("*").startswith("v"):
+                    continue
+                if run_name in re.findall(r"`([^`]+)`", cols[2]):
+                    return cols[0].strip("*").split()[0].strip("*")
+    except OSError:
+        pass
+    return run_name
+
+
 def retired_runs():
     """Run files listed in results/retired.txt: versions we decided against for football reasons.
 
@@ -279,8 +298,10 @@ def show(entry):
     rule = entry.get("keep_rule")
     if rule:
         verdict = "KEEP" if rule["keep"] else "DON'T KEEP"
-        print("against best so far ({}): headline {:+.3f}, drops over {} ({} clean): {} -> {}"
-              .format(rule["against_model"], rule["headline_gain"], MAX_DROP, CLEAN_MAX_DROP,
+        stamp = os.path.basename(rule.get("against", ""))[:15]
+        print("against best so far ({}, run {}): headline {:+.3f}, drops over {} ({} clean): "
+              "{} -> {}".format(version_name(rule["against_model"]), stamp, rule["headline_gain"],
+                      MAX_DROP, CLEAN_MAX_DROP,
             rule["drops_over_limit"] or "none", verdict))
     else:
         print("first run on this seed: nothing to compare against")
