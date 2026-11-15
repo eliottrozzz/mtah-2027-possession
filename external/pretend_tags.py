@@ -167,23 +167,28 @@ def corrupt_team(team, kind, rng):
     return team
 
 
-def make_tag(kick_row, team, kind, rng, raw):
-    start = kick_row + int(round((-START_LEAD_S + rng.uniform(-1, 1) * START_JITTER_S) * FPS))
-    duration = max(MIN_DURATION_S, DURATION_S + rng.uniform(-1, 1) * DURATION_JITTER_S)
+def make_tag(kick_row, team, kind, rng, raw, jitter_scale=1.0):
+    start = kick_row + int(round(
+        (-START_LEAD_S + rng.uniform(-1, 1) * START_JITTER_S * jitter_scale) * FPS))
+    duration = max(MIN_DURATION_S,
+                   DURATION_S + rng.uniform(-1, 1) * DURATION_JITTER_S * jitter_scale)
     return {"start_frame": start, "end_frame": start + int(round(duration * FPS)),
             "team": corrupt_team(team, kind, rng), "type": kind, "type_raw": raw}
 
 
-def corrupt(restarts, period, rng):
+def corrupt(restarts, period, rng, miss_scale=1.0, jitter_scale=1.0):
     """Corrupted tags from clean (kick row, team, type) restarts: misses, timing jitter, wrong
     or N/A team, and invented tags. period is the tracking's period array (0 outside the halves);
-    tags are clipped to the rows that exist and sorted by start."""
+    tags are clipped to the rows that exist and sorted by start. miss_scale multiplies every miss
+    rate (capped at 1) and jitter_scale both jitters (start and duration), e.g. 2 and 2 for a
+    harsh robustness variant. The random draws don't depend on the scales, so a harsh variant
+    misses a superset of the default's tags and moves each tag the same way, only further."""
     n = len(period)
     tags = []
     for kick_row, team, kind in restarts:
         draws = rng.random()  # drawn for every restart, so one rate change doesn't reshuffle all
-        tag = make_tag(kick_row, team, kind, rng, "pretend")
-        if draws >= MISS_RATE[kind]:
+        tag = make_tag(kick_row, team, kind, rng, "pretend", jitter_scale)
+        if draws >= min(1.0, MISS_RATE[kind] * miss_scale):
             tags.append(tag)
     in_half = np.flatnonzero(period > 0)
     minutes = len(in_half) / FPS / 60.0
@@ -192,7 +197,8 @@ def corrupt(restarts, period, rng):
     for _ in range(rng.poisson(FALSE_POSITIVES_PER_90 * minutes / 90.0)):
         kind = kinds[rng.choice(len(kinds), p=weights / weights.sum())]
         team = ("H", "A")[rng.integers(2)]
-        tags.append(make_tag(int(rng.choice(in_half)), team, kind, rng, "pretend_fp"))
+        tags.append(make_tag(int(rng.choice(in_half)), team, kind, rng, "pretend_fp",
+                             jitter_scale))
     for tag in tags:
         tag["start_frame"] = int(np.clip(tag["start_frame"], 0, n - 1))
         tag["end_frame"] = int(np.clip(tag["end_frame"], tag["start_frame"], n - 1))
@@ -207,12 +213,14 @@ def period_of(source, game):
     return dt.load_game(game)["period"]
 
 
-def pretend_tags(source, game, seed=0, period=None):
+def pretend_tags(source, game, seed=0, period=None, miss_scale=1.0, jitter_scale=1.0):
     """Corrupted set-piece tags for one external game. seed picks the corruption draw (use the
-    tracking copy's seed so a level/seed pair always sees the same tags)."""
+    tracking copy's seed so a level/seed pair always sees the same tags). miss_scale and
+    jitter_scale scale the miss rates (capped at 1) and the jitters; see corrupt()."""
     if period is None:
         period = period_of(source, game)
-    return corrupt(clean_restarts(source, game), period, rng_for(source, game, seed))
+    return corrupt(clean_restarts(source, game), period, rng_for(source, game, seed),
+                   miss_scale, jitter_scale)
 
 
 def all_games():

@@ -38,6 +38,15 @@ def main():
     jitter = [min(abs(t["start_frame"] - k) for k in kicks) for t in a
               if t["type_raw"] == "pretend"]
     assert np.max(jitter) <= (pt.START_LEAD_S + pt.START_JITTER_S) * pt.FPS + 1
+    # Harsh variant: a subset of the default's real tags, each moved the same way, further.
+    harsh = pt.pretend_tags("metrica", 1, 0, period=period, miss_scale=2, jitter_scale=2)
+    real_a = [t for t in a if t["type_raw"] == "pretend"]
+    real_h = [t for t in harsh if t["type_raw"] == "pretend"]
+    assert len(real_h) < len(real_a)
+    assert pt.pretend_tags("metrica", 1, 0, period=period, miss_scale=1, jitter_scale=1) == a
+    jit_h = [min(abs(t["start_frame"] - k) for k in kicks) for t in real_h]
+    assert np.max(jit_h) <= 2 * (pt.START_LEAD_S + pt.START_JITTER_S) * pt.FPS + 1
+    print("harsh (x2, x2): {} real tags vs {}".format(len(real_h), len(real_a)))
     print("pretend_tags checks passed ({} tags, {} start exactly on a kick)".format(len(a), exact))
 
 
