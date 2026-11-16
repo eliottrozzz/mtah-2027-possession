@@ -1,0 +1,210 @@
+{
+ "model": "baseline_noball_dead",
+ "spec": "models.baselines:NoBallDead",
+ "settings": {
+  "switch_s": 0.5,
+  "no_ball": "D"
+ },
+ "seed": 0,
+ "who": "Bucha",
+ "note": "new bar on the answer key with Eliott's goal-kick rule",
+ "time": "2026-11-12T12:07:08",
+ "branch": "jordan/scoring",
+ "commit": "0e13b4e52fde5bbd16088e747b74208c3844b52d",
+ "dirty": false,
+ "headline": 0.13149813109148148,
+ "per_game": {
+  "1": 0.1444738918749907,
+  "2": 0.1308877091593307,
+  "3": 0.11913279224012308
+ },
+ "cells": {
+  "1": {
+   "reception": {
+    "20": {
+     "spell_f1": 0.15703289013296012,
+     "macro_f1": 0.5866976301848165,
+     "n_gt_spells": 317,
+     "n_pred_spells": 1112,
+     "spell_f1_range": [
+      0.14134359692092371,
+      0.17326801959412177
+     ]
+    },
+    "35": {
+     "spell_f1": 0.1319148936170213,
+     "macro_f1": 0.5439759398564143,
+     "n_gt_spells": 317,
+     "n_pred_spells": 999,
+     "spell_f1_range": [
+      0.11518237082066872,
+      0.14623100303951367
+     ]
+    },
+    "50": {
+     "spell_f1": 0.09655172413793103,
+     "macro_f1": 0.4449628466925941,
+     "n_gt_spells": 317,
+     "n_pred_spells": 930
+    },
+    "clean": {
+     "spell_f1": 0.2442225392296719,
+     "macro_f1": 0.8062362221769609,
+     "n_gt_spells": 317,
+     "n_pred_spells": 1085
+    }
+   },
+   "kick": {
+    "20": {
+     "spell_f1": 0.16701173222912352,
+     "macro_f1": 0.6095001688369966,
+     "n_gt_spells": 337,
+     "n_pred_spells": 1112
+    },
+    "35": {
+     "spell_f1": 0.1410179640718563,
+     "macro_f1": 0.5666132796898015,
+     "n_gt_spells": 337,
+     "n_pred_spells": 999
+    },
+    "50": {
+     "spell_f1": 0.11081294396211523,
+     "macro_f1": 0.4699413130399373,
+     "n_gt_spells": 337,
+     "n_pred_spells": 930
+    },
+    "clean": {
+     "spell_f1": 0.2576652601969058,
+     "macro_f1": 0.8271493479445703,
+     "n_gt_spells": 337,
+     "n_pred_spells": 1085
+    }
+   }
+  },
+  "2": {
+   "reception": {
+    "20": {
+     "spell_f1": 0.14956521739130435,
+     "macro_f1": 0.6274725630720609,
+     "n_gt_spells": 288,
+     "n_pred_spells": 1092,
+     "spell_f1_range": [
+      0.13389855072463766,
+      0.16524637681159418
+     ]
+    },
+    "35": {
+     "spell_f1": 0.11221020092735705,
+     "macro_f1": 0.5451461695733405,
+     "n_gt_spells": 288,
+     "n_pred_spells": 1006,
+     "spell_f1_range": [
+      0.0992117465224111,
+      0.12551777434312208
+     ]
+    },
+    "50": {
+     "spell_f1": 0.1033824804856895,
+     "macro_f1": 0.508639105590558,
+     "n_gt_spells": 288,
+     "n_pred_spells": 865
+    },
+    "clean": {
+     "spell_f1": 0.22058823529411767,
+     "macro_f1": 0.8482099159767991,
+     "n_gt_spells": 288,
+     "n_pred_spells": 1072
+    }
+   },
+   "kick": {
+    "20": {
+     "spell_f1": 0.15954253037884203,
+     "macro_f1": 0.6491296840893713,
+     "n_gt_spells": 307,
+     "n_pred_spells": 1092
+    },
+    "35": {
+     "spell_f1": 0.12520944402132522,
+     "macro_f1": 0.5690604234881077,
+     "n_gt_spells": 307,
+     "n_pred_spells": 1006
+    },
+    "50": {
+     "spell_f1": 0.12525597269624572,
+     "macro_f1": 0.5357152000970103,
+     "n_gt_spells": 307,
+     "n_pred_spells": 865
+    },
+    "clean": {
+     "spell_f1": 0.24249456127628716,
+     "macro_f1": 0.8703248970616397,
+     "n_gt_spells": 307,
+     "n_pred_spells": 1072
+    }
+   }
+  },
+  "3": {
+   "reception": {
+    "20": {
+     "spell_f1": 0.12953249714937287,
+     "macro_f1": 0.6153323482355474,
+     "n_gt_spells": 364,
+     "n_pred_spells": 1390,
+     "spell_f1_range": [
+      0.1183466362599772,
+      0.1434435575826682
+     ]
+    },
+    "35": {
+     "spell_f1": 0.10873308733087328,
+     "macro_f1": 0.529866852127097,
+     "n_gt_spells": 364,
+     "n_pred_spells": 1262,
+     "spell_f1_range": [
+      0.09691266912669126,
+      0.12131611316113163
+     ]
+    },
+    "50": {
+     "spell_f1": 0.09166666666666667,
+     "macro_f1": 0.5002381085713364,
+     "n_gt_spells": 364,
+     "n_pred_spells": 1076
+    },
+    "clean": {
+     "spell_f1": 0.2033086138049059,
+     "macro_f1": 0.84386654961787,
+     "n_gt_spells": 364,
+     "n_pred_spells": 1389
+    }
+   },
+   "kick": {
+    "20": {
+     "spell_f1": 0.13288135593220338,
+     "macro_f1": 0.6333218701323867,
+     "n_gt_spells": 380,
+     "n_pred_spells": 1390
+    },
+    "35": {
+     "spell_f1": 0.11571254567600489,
+     "macro_f1": 0.5481963405506245,
+     "n_gt_spells": 380,
+     "n_pred_spells": 1262
+    },
+    "50": {
+     "spell_f1": 0.10686813186813186,
+     "macro_f1": 0.5180143443298464,
+     "n_gt_spells": 380,
+     "n_pred_spells": 1076
+    },
+    "clean": {
+     "spell_f1": 0.21639344262295085,
+     "macro_f1": 0.8663712299496815,
+     "n_gt_spells": 380,
+     "n_pred_spells": 1389
+    }
+   }
+  }
+ },
+ "keep_rule": null
+}

@@ -1,0 +1,307 @@
+{
+ "model": "touch_dead_v3_shape",
+ "spec": "models.touch_dead:TouchDeadShape",
+ "settings": {
+  "touch": {
+   "min_strength": 1.0,
+   "min_strength_rel": null,
+   "radius_m": 3.5,
+   "window": 12,
+   "assign": "at",
+   "deflection_s": 0.5,
+   "reappear_s": 0.2,
+   "leave_m": 0.0,
+   "gap_rule": "advance",
+   "gap_min_s": 5.0,
+   "gap_shift_s": 1.0
+  },
+  "dead": {
+   "windows_s": [
+    2,
+    8,
+    20
+   ],
+   "side_window_s": 6,
+   "l2": 1.0,
+   "max_gap_frames": 100,
+   "carry_radius_m": 2.0,
+   "inputs": [
+    "median_speed",
+    "fast_speed",
+    "walking",
+    "sprinting",
+    "shape_moving",
+    "gathered",
+    "at_touchline",
+    "ball_out",
+    "ball_still",
+    "still_stretch",
+    "out_then_still"
+   ],
+   "post": {
+    "threshold": 0.55,
+    "min_dead_s": 4,
+    "min_live_s": 2
+   },
+   "post_grid": {
+    "threshold": [
+     0.35,
+     0.45,
+     0.55,
+     0.65
+    ],
+    "min_dead_s": [
+     2,
+     4,
+     8,
+     12
+    ],
+    "min_live_s": [
+     2,
+     4,
+     8,
+     12
+    ]
+   }
+  },
+  "restart_from_next_touch": true,
+  "snap": {
+   "snap": "first",
+   "snap_s": 1.0
+  },
+  "shape": {
+   "windows_s": [
+    1,
+    4,
+    12
+   ],
+   "side_window_s": 6,
+   "forward_step_s": 1.0,
+   "signals": [
+    "spread_x",
+    "spread_y",
+    "depth",
+    "forward"
+   ]
+  },
+  "override": {
+   "sure": 0.4,
+   "min_s": 0.5
+  }
+ },
+ "seed": 0,
+ "who": "agentD",
+ "note": "v3 + team-shape prior override where sure (Track D idea 1), on top of 474aecd",
+ "time": "2026-11-13T19:50:41",
+ "branch": "jordan/ideas",
+ "commit": "b1ea1695671343365c6fd17d31b3089682f55a5e",
+ "dirty": false,
+ "headline": 0.5268454863336919,
+ "per_game": {
+  "1": 0.5438241707125622,
+  "2": 0.5168874425052723,
+  "3": 0.5198248457832411
+ },
+ "cells": {
+  "1": {
+   "reception": {
+    "20": {
+     "spell_f1": 0.5572881355932203,
+     "macro_f1": 0.8816747912813122,
+     "n_gt_spells": 317,
+     "n_pred_spells": 273,
+     "spell_f1_range": [
+      0.5118305084745763,
+      0.5959661016949152
+     ]
+    },
+    "35": {
+     "spell_f1": 0.530360205831904,
+     "macro_f1": 0.8585696098454493,
+     "n_gt_spells": 317,
+     "n_pred_spells": 266,
+     "spell_f1_range": [
+      0.4862092624356775,
+      0.5682332761578044
+     ]
+    },
+    "50": {
+     "spell_f1": 0.5171577123050259,
+     "macro_f1": 0.8636797674584727,
+     "n_gt_spells": 317,
+     "n_pred_spells": 260
+    },
+    "clean": {
+     "spell_f1": 0.6378947368421052,
+     "macro_f1": 0.8717211654220197,
+     "n_gt_spells": 317,
+     "n_pred_spells": 253
+    }
+   },
+   "kick": {
+    "20": {
+     "spell_f1": 0.5409836065573771,
+     "macro_f1": 0.866472409096089,
+     "n_gt_spells": 337,
+     "n_pred_spells": 273
+    },
+    "35": {
+     "spell_f1": 0.5154228855721392,
+     "macro_f1": 0.8521841307476831,
+     "n_gt_spells": 337,
+     "n_pred_spells": 266
+    },
+    "50": {
+     "spell_f1": 0.5038525963149079,
+     "macro_f1": 0.8533280069783505,
+     "n_gt_spells": 337,
+     "n_pred_spells": 260
+    },
+    "clean": {
+     "spell_f1": 0.6677966101694915,
+     "macro_f1": 0.892457153222682,
+     "n_gt_spells": 337,
+     "n_pred_spells": 253
+    }
+   }
+  },
+  "2": {
+   "reception": {
+    "20": {
+     "spell_f1": 0.5184165232358005,
+     "macro_f1": 0.8591358966929095,
+     "n_gt_spells": 288,
+     "n_pred_spells": 293,
+     "spell_f1_range": [
+      0.48051635111876073,
+      0.5590361445783133
+     ]
+    },
+    "35": {
+     "spell_f1": 0.5153583617747441,
+     "macro_f1": 0.8507488171901082,
+     "n_gt_spells": 288,
+     "n_pred_spells": 298,
+     "spell_f1_range": [
+      0.47849829351535844,
+      0.565938566552901
+     ]
+    },
+    "50": {
+     "spell_f1": 0.4992957746478874,
+     "macro_f1": 0.8515143460785923,
+     "n_gt_spells": 288,
+     "n_pred_spells": 280
+    },
+    "clean": {
+     "spell_f1": 0.6903225806451613,
+     "macro_f1": 0.8806565775798111,
+     "n_gt_spells": 288,
+     "n_pred_spells": 270
+    }
+   },
+   "kick": {
+    "20": {
+     "spell_f1": 0.5033333333333333,
+     "macro_f1": 0.8528580374402636,
+     "n_gt_spells": 307,
+     "n_pred_spells": 293
+    },
+    "35": {
+     "spell_f1": 0.4945454545454546,
+     "macro_f1": 0.8460627342420924,
+     "n_gt_spells": 307,
+     "n_pred_spells": 298
+    },
+    "50": {
+     "spell_f1": 0.48722316865417375,
+     "macro_f1": 0.8416244581716507,
+     "n_gt_spells": 307,
+     "n_pred_spells": 280
+    },
+    "clean": {
+     "spell_f1": 0.7022530329289427,
+     "macro_f1": 0.8963253529086671,
+     "n_gt_spells": 307,
+     "n_pred_spells": 270
+    }
+   }
+  },
+  "3": {
+   "reception": {
+    "20": {
+     "spell_f1": 0.5408618127786032,
+     "macro_f1": 0.8613351107635309,
+     "n_gt_spells": 364,
+     "n_pred_spells": 309,
+     "spell_f1_range": [
+      0.5022288261515603,
+      0.5854680534918276
+     ]
+    },
+    "35": {
+     "spell_f1": 0.49878787878787884,
+     "macro_f1": 0.8582619478614797,
+     "n_gt_spells": 364,
+     "n_pred_spells": 296,
+     "spell_f1_range": [
+      0.45812121212121215,
+      0.5424848484848486
+     ]
+    },
+    "50": {
+     "spell_f1": 0.4759571209800919,
+     "macro_f1": 0.8501941253934865,
+     "n_gt_spells": 364,
+     "n_pred_spells": 289
+    },
+    "clean": {
+     "spell_f1": 0.6608695652173913,
+     "macro_f1": 0.8637284042562942,
+     "n_gt_spells": 364,
+     "n_pred_spells": 303
+    }
+   },
+   "kick": {
+    "20": {
+     "spell_f1": 0.5294629898403482,
+     "macro_f1": 0.8544199695644595,
+     "n_gt_spells": 380,
+     "n_pred_spells": 309
+    },
+    "35": {
+     "spell_f1": 0.4822485207100592,
+     "macro_f1": 0.8483422799794758,
+     "n_gt_spells": 380,
+     "n_pred_spells": 296
+    },
+    "50": {
+     "spell_f1": 0.4591928251121075,
+     "macro_f1": 0.8411466748118848,
+     "n_gt_spells": 380,
+     "n_pred_spells": 289
+    },
+    "clean": {
+     "spell_f1": 0.6805270863836017,
+     "macro_f1": 0.8722833127542864,
+     "n_gt_spells": 380,
+     "n_pred_spells": 303
+    }
+   }
+  }
+ },
+ "keep_rule": {
+  "against": "20261113-131831_touch_dead_v3_seed0.json",
+  "against_model": "touch_dead_v3",
+  "headline_gain": 0.0479,
+  "drops_over_limit": {
+   "game1 reception clean": 0.0771,
+   "game1 kick clean": 0.0752,
+   "game2 reception clean": 0.0741,
+   "game2 kick clean": 0.0745,
+   "game3 reception clean": 0.0592,
+   "game3 kick clean": 0.056
+  },
+  "keep": false
+ }
+}

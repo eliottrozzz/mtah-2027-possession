@@ -161,6 +161,35 @@ The notebooks additionally want `kloppy` and `matplotlib` (`requirements-starter
 
 ---
 
+## Reproduce our submission
+
+Python 3.9 or later; `requirements.txt` (numpy and pandas) is all it needs. Measure the provided
+tracking, fit and score on the external (Metrica) games, then predict the match:
+
+```bash
+python3 -m venv .venv && source .venv/bin/activate
+pip install -r requirements.txt
+export MTAH_DATA_DIR=/path/to/data/bundle
+python external/measure_ball_gaps.py           # writes data/ball_gap_stats.json
+python external/metrica_labels.py
+python external/metrica_labels.py --restart kick
+python external/metrica_tracking.py
+python external/metrica_noise.py --calibration data/ball_gap_stats.json
+python evaluation/score_external.py --model models.v4_proto:V4ProtoCap
+python predict_match.py --out evaluation/results/submission.csv
+```
+
+`data/ball_gap_stats.json` is an aggregate measurement of how the provided tracking loses the ball
+(how often, gap lengths, where gaps start). It holds no frames, positions or labels, and it is not
+committed, so it is regenerated from the data bundle as above. `metrica_noise.py` copies those
+numbers onto the Metrica games. The Metrica steps download the public sample data from GitHub.
+
+`score_external.py` should print `v4  seed 0  headline 0.557`. v4 takes about 20–30 minutes to fit
+on a laptop. The fallback model is v3.1 (`--model models.touch_dead:TouchDeadShapeUnseen`, headline
+0.491; about 8–9 minutes). `predict_match.py` uses v4 by default (`--model` picks another) and runs
+the official format check. Details are in `docs/technical_document.md`; the model history is in
+`docs/model_versions.md`.
+
 ## Timeline
 
 | |                |
