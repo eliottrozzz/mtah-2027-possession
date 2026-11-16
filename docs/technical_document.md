@@ -246,8 +246,13 @@ the video. Full reasoning and evidence are in `POSSESSION_RULES.md`.
   forecast of the score on the match.
 - **Offline only.** Some signals use the whole half (speed scaling) or look a few seconds ahead,
   so this labels a recorded match, not a live one.
-- **With more time:** a ball detector on the tactical video for the frames the tracking misses,
-  and more labelled matches to fit on.
+- **With more time:**
+  - Add the broadcast-camera tracking (164,488 frames). It isn't synchronised with the tactical
+    video, so it first needs aligning. Then it could supply a second view of the ball, and of the
+    players near it, on frames where the tactical tracking loses it. That is where most of our
+    errors are.
+  - A ball detector on the tactical video for the frames the tracking misses.
+  - More labelled matches to fit on.
 
 ## 6. Reproduction
 

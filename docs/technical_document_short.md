@@ -132,8 +132,12 @@ Full reasoning is in `POSSESSION_RULES.md`.
   for removing noise.
 - **Unseen touches** (headers, touches on a high or missing ball) make switches show up late.
 - **Offline only:** some signals look a few seconds ahead.
-- **With more time:** a ball detector on the video for frames the tracking misses, fusing the
-  broadcast tracking, and more labelled matches.
+- **With more time:**
+  - Add the broadcast-camera tracking. It isn't synchronised with the tactical video, so it first
+    needs aligning. Then it could supply a second view of the ball on frames where the tactical
+    tracking loses it.
+  - A ball detector on the tactical video for frames the tracking misses.
+  - More labelled matches to fit on.
 
 ## 6. Reproduction
 
