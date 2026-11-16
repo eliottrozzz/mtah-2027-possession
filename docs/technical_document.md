@@ -1,7 +1,6 @@
-# [Team name]: ball possession from tracking alone
+# Bayesian Munich: ball possession from tracking alone
 
-*More than a Hack 2027, Phase 1. DRAFT: numbers in [brackets] or marked "to update" change
-before submission.*
+*More than a Hack 2027, Phase 1. Submitted model: v4.*
 
 ## 1. Approach
 
@@ -91,7 +90,7 @@ exception set out in section 3: the limit on v4's switch penalty.
 | Idea | Why it was dropped |
 |---|---|
 | "No ball = dead ball" baseline | It splits real possessions wherever the ball is lost during play |
-| Nearest-player possession | Switches whenever an opponent is close without touching the ball. Our first floor: [0.165] |
+| Nearest-player possession | Switches whenever an opponent is close without touching the ball. Our first floor: 0.150 spellF1 on the final answer keys |
 | A minimum hold time (2 s) before possession counts | Erases the real sub-second possessions the ground truth contains |
 | Hysteresis thresholds for dead runs | No gain |
 | Learned shifts of dead-run edges | No gain: timing errors fall both early and late |
@@ -120,7 +119,7 @@ exception set out in section 3: the limit on v4's switch penalty.
 ## 3. Training data
 
 **Games.** Metrica Sports' three open sample games (github.com/metrica-sports/sample-data):
-tracking at 25 fps plus event data. *[To confirm: licence wording.]* No data from the provided
+tracking at 25 fps plus event data. The repository has no formal licence; it asks public users to acknowledge Metrica Sports as the source, which we do here. No data from the provided
 match is used for training, fitting or tuning.
 
 **Labels.** The games have no possession labels, so we built them from Metrica's events, following
@@ -262,7 +261,7 @@ python external/metrica_labels.py --restart kick
 python external/metrica_tracking.py              # their tracking
 python external/metrica_noise.py --calibration data/ball_gap_stats.json   # noisy copies
 python evaluation/score_external.py --model models.v4_proto:V4ProtoCap   # external scores (v4)
-python predict_match.py --model models.v4_proto:V4ProtoCap --out evaluation/results/[team].csv
+python predict_match.py --model models.v4_proto:V4ProtoCap --out "evaluation/results/Bayesian Munich.csv"
 ```
 
 v3.1 is our fallback: pass `--model models.touch_dead:TouchDeadShapeUnseen` to either command.

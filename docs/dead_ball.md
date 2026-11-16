@@ -1,6 +1,6 @@
 # Dead-ball detection
 
-*Draft section for the technical document. Code: `models/dead_ball.py`.*
+*Background for the technical document (an earlier dead-ball model; the submitted v4 builds on it). Code: `models/dead_ball.py`.*
 
 ## Approach
 
@@ -44,7 +44,7 @@ The filled ball feeds the dead-ball signals only, never the possession model's t
 ## Training data
 
 - **Games:** Metrica Sports' three open sample games (github.com/metrica-sports/sample-data), with
-  tracking and event data. *[To confirm: licence wording.]*
+  tracking and event data, credited to Metrica Sports as their repository asks.
 - **Answer key:** built by our team from Metrica's events, following our possession rules (see
   that section). A dead run starts at the ball going out, a foul, a goal, an offside, a handball
   or the end of a half. It ends when the restart pass is received, goal kicks included. A
