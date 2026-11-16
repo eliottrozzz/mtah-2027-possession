@@ -1,4 +1,4 @@
-# Possession rules (working draft)
+# Possession rules
 
 What we think the ground truth means by "possession", worked out from CHALLENGE.md and from inspecting the public 5 minutes against the tactical video. These rules drive both our answer key for the external games and the design of the model.
 
