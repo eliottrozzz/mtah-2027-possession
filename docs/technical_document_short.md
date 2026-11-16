@@ -55,6 +55,7 @@ on three games, and every decision can be explained.
 | Homography, broadcast video and tracking | Not used |
 
 **Tried and dropped:**
+
 - nearest-player possession;
 - a minimum hold time;
 - longer deflection windows;
@@ -75,6 +76,7 @@ labelling, and nothing from the provided match.
 
 **Realistic noise.** Metrica's tracking is far cleaner than the provided match. So we fit and
 score on noisy copies (`external/metrica_noise.py`):
+
 - the ball is hidden on 20%, 35% or 50% of live frames, mostly in the air, on slow balls and in
   crowds;
 - the ball position is smoothed;
@@ -84,6 +86,7 @@ The settings copy aggregate statistics measured on the provided tracking.
 
 **Validation and keep rule.** We fit on two games and score the third, three times. The headline
 is spellF1 averaged over the 20% and 35% copies and the three games. A change was kept only if:
+
 - the headline rose;
 - no single result fell by more than 0.02;
 - no result on clean tracking fell by more than 0.05.
@@ -104,6 +107,7 @@ gain carries over to another provider, but it is smaller. We read the Metrica nu
 ranking, not a forecast.
 
 **Disclosures.**
+
 - v4's switch penalty was capped at 0.5–1 after we saw that uncapped penalties failed the clean
   guard on the seed-0 test games. So that cap is not independent of them, which is why the DFL
   check matters.
@@ -133,11 +137,11 @@ Full reasoning is in `POSSESSION_RULES.md`.
 - **Unseen touches** (headers, touches on a high or missing ball) make switches show up late.
 - **Offline only:** some signals look a few seconds ahead.
 - **With more time:**
-  - Add the broadcast-camera tracking. It isn't synchronised with the tactical video, so it first
-    needs aligning. Then it could supply a second view of the ball on frames where the tactical
+    - Add the broadcast-camera tracking. It isn't synchronised with the tactical video, so it first
+      needs aligning. Then it could supply a second view of the ball on frames where the tactical
     tracking loses it.
-  - A ball detector on the tactical video for frames the tracking misses.
-  - More labelled matches to fit on.
+    - A ball detector on the tactical video for frames the tracking misses.
+    - More labelled matches to fit on.
 
 ## 6. Reproduction
 
@@ -149,7 +153,7 @@ python external/measure_ball_gaps.py       # aggregate ball-gap statistics
 python external/metrica_labels.py && python external/metrica_labels.py --restart kick
 python external/metrica_tracking.py
 python external/metrica_noise.py --calibration data/ball_gap_stats.json
-python predict_match.py --out "evaluation/results/Bayesian Munich.csv"   # v4, ~30 min
+python predict_match.py --out "evaluation/results/Bayesian_Munich.csv"   # v4, ~30 min
 ```
 
 Fitting is deterministic: the same commands give the same file. v3.1, our fallback, is

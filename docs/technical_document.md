@@ -247,12 +247,12 @@ the video. Full reasoning and evidence are in `POSSESSION_RULES.md`.
 - **Offline only.** Some signals use the whole half (speed scaling) or look a few seconds ahead,
   so this labels a recorded match, not a live one.
 - **With more time:**
-  - Add the broadcast-camera tracking (164,488 frames). It isn't synchronised with the tactical
-    video, so it first needs aligning. Then it could supply a second view of the ball, and of the
+    - Add the broadcast-camera tracking (164,488 frames). It isn't synchronised with the tactical
+      video, so it first needs aligning. Then it could supply a second view of the ball, and of the
     players near it, on frames where the tactical tracking loses it. That is where most of our
     errors are.
-  - A ball detector on the tactical video for the frames the tracking misses.
-  - More labelled matches to fit on.
+    - A ball detector on the tactical video for the frames the tracking misses.
+    - More labelled matches to fit on.
 
 ## 6. Reproduction
 
@@ -266,7 +266,7 @@ python external/metrica_labels.py --restart kick
 python external/metrica_tracking.py              # their tracking
 python external/metrica_noise.py --calibration data/ball_gap_stats.json   # noisy copies
 python evaluation/score_external.py --model models.v4_proto:V4ProtoCap   # external scores (v4)
-python predict_match.py --model models.v4_proto:V4ProtoCap --out "evaluation/results/Bayesian Munich.csv"
+python predict_match.py --model models.v4_proto:V4ProtoCap --out "evaluation/results/Bayesian_Munich.csv"
 ```
 
 v3.1 is our fallback: pass `--model models.touch_dead:TouchDeadShapeUnseen` to either command.
