@@ -7,7 +7,7 @@ match, its ground truth or its video.
     python evaluation/score_external.py --model models.baselines:NoBallDead --seed 1   # milestone
     python evaluation/score_external.py --summary                                      # the log
 
-How it works (agreed 2026-11-11, see TEAM_SETUP.md):
+How it works (agreed 2026-11-11):
   * Train on two games, test on the third, three rounds. fit() sees the training games at the
     tuning levels (live20, live35) with the reception answer key; predict() then runs on the test
     game at every level.
